@@ -19,6 +19,13 @@
   // 警告パルス管理
   let pulseTimer = 0;
 
+  // ドローン(持続音)管理
+  let droneOsc1 = null;   // sawtooth (基音 55-110Hz)
+  let droneOsc2 = null;   // sine (2倍音 110-220Hz)
+  let droneFilter = null; // lowpass (300-2000Hz)
+  let droneGain = null;   // gain (0.04-0.18)
+  let isDroneActive = false;
+
   // ミュート状態の復元
   try {
     const saved = localStorage.getItem(STORAGE_KEY_MUTED);
@@ -46,7 +53,7 @@
         masterGain.gain.setValueAtTime(isMutedState ? 0 : 1, audioCtx.currentTime);
         masterGain.connect(audioCtx.destination);
 
-        // ホワイトノイズ用バッファの事前生成 (1秒分)
+        // ホワイトノイズ用バッファの事前生成 (2.5秒分)
         createNoiseBuffer();
       }
 
@@ -61,13 +68,13 @@
   }
 
   /**
-   * ホワイトノイズバッファの生成
+   * ホワイトノイズバッファの生成 (2.5秒分)
    */
   function createNoiseBuffer() {
     if (!audioCtx) return;
     try {
       const sampleRate = audioCtx.sampleRate || 44100;
-      const bufferSize = sampleRate * 1.0; // 1秒分
+      const bufferSize = Math.floor(sampleRate * 2.5); // 2.5秒分 (ビッグバン1.8秒に対応)
       noiseBuffer = audioCtx.createBuffer(1, bufferSize, sampleRate);
       const data = noiseBuffer.getChannelData(0);
       for (let i = 0; i < bufferSize; i++) {
@@ -137,20 +144,161 @@
   }
 
   /**
+   * 押下中の持続音(ドローン)を開始
+   * オシレーター2本 (基音sawtooth + 2倍音sine) をローパス経由で masterGain へ
+   * 押した瞬間から鳴るよう初期ゲイン0.04へ素早く立ち上げる
+   */
+  function startDrone() {
+    if (!initAudio()) return;
+    if (isDroneActive) {
+      stopDrone(true);
+    }
+
+    try {
+      const now = audioCtx.currentTime;
+
+      // 1. 基音: sawtooth (55Hz)
+      droneOsc1 = audioCtx.createOscillator();
+      droneOsc1.type = 'sawtooth';
+      droneOsc1.frequency.setValueAtTime(55, now);
+
+      // 2. 2倍音: sine (110Hz)
+      droneOsc2 = audioCtx.createOscillator();
+      droneOsc2.type = 'sine';
+      droneOsc2.frequency.setValueAtTime(110, now);
+
+      // 3. ローパスフィルター (初期 300Hz)
+      droneFilter = audioCtx.createBiquadFilter();
+      droneFilter.type = 'lowpass';
+      droneFilter.frequency.setValueAtTime(300, now);
+
+      // 4. ドローンゲイン (初期 0.04)
+      droneGain = audioCtx.createGain();
+      droneGain.gain.setValueAtTime(0.0001, now);
+      droneGain.gain.linearRampToValueAtTime(0.04, now + 0.015);
+
+      droneOsc1.connect(droneFilter);
+      droneOsc2.connect(droneFilter);
+      droneFilter.connect(droneGain);
+      droneGain.connect(masterGain);
+
+      droneOsc1.start(now);
+      droneOsc2.start(now);
+      isDroneActive = true;
+    } catch (e) {
+      cleanupDroneNodes();
+    }
+  }
+
+  /**
+   * ドローンパラメータの更新 (毎フレーム滑らかに追従)
+   * @param {number} dangerRatio 現在の危険度比率 (0.0〜)
+   */
+  function updateDrone(dangerRatio) {
+    if (!isDroneActive || !audioCtx || !droneGain || !droneFilter || !droneOsc1 || !droneOsc2) return;
+    try {
+      const now = audioCtx.currentTime;
+      const ratio = Math.max(0, Math.min(1.0, dangerRatio));
+
+      // 基音の周波数: 55Hz -> 110Hz
+      const baseFreq = 55 + ratio * 55;
+      // 2倍音の周波数: 110Hz -> 220Hz
+      const harmonicFreq = baseFreq * 2;
+      // ローパスのカットオフ: 300Hz -> 2000Hz
+      const cutoff = 300 + ratio * 1700;
+      // 音量: 0.04 -> 0.18
+      const volume = 0.04 + ratio * (0.18 - 0.04);
+
+      // setTargetAtTime で滑らかに追従 (クリックノイズを防止)
+      droneOsc1.frequency.setTargetAtTime(baseFreq, now, 0.035);
+      droneOsc2.frequency.setTargetAtTime(harmonicFreq, now, 0.035);
+      droneFilter.frequency.setTargetAtTime(cutoff, now, 0.035);
+      droneGain.gain.setTargetAtTime(volume, now, 0.035);
+    } catch (e) {}
+  }
+
+  /**
+   * ドローンを停止 (リリース時のフェードアウトまたは即時停止)
+   * @param {boolean} [immediate=false] 即時停止フラグ
+   */
+  function stopDrone(immediate) {
+    if (!isDroneActive && !droneGain) return;
+    isDroneActive = false;
+
+    if (!audioCtx || !droneGain) {
+      cleanupDroneNodes();
+      return;
+    }
+
+    try {
+      const now = audioCtx.currentTime;
+      const osc1 = droneOsc1;
+      const osc2 = droneOsc2;
+      const gain = droneGain;
+      const filter = droneFilter;
+
+      droneOsc1 = null;
+      droneOsc2 = null;
+      droneGain = null;
+      droneFilter = null;
+
+      if (immediate) {
+        if (osc1) { osc1.stop(); osc1.disconnect(); }
+        if (osc2) { osc2.stop(); osc2.disconnect(); }
+        if (filter) filter.disconnect();
+        if (gain) gain.disconnect();
+      } else {
+        // リリース時は約50msで滑らかにフェードアウト
+        gain.gain.cancelScheduledValues(now);
+        gain.gain.setValueAtTime(gain.gain.value, now);
+        gain.gain.linearRampToValueAtTime(0.0001, now + 0.05);
+
+        setTimeout(function () {
+          try {
+            if (osc1) { osc1.stop(); osc1.disconnect(); }
+            if (osc2) { osc2.stop(); osc2.disconnect(); }
+            if (filter) filter.disconnect();
+            if (gain) gain.disconnect();
+          } catch (err) {}
+        }, 70);
+      }
+    } catch (e) {
+      cleanupDroneNodes();
+    }
+  }
+
+  function cleanupDroneNodes() {
+    try {
+      if (droneOsc1) { droneOsc1.stop(); droneOsc1.disconnect(); }
+      if (droneOsc2) { droneOsc2.stop(); droneOsc2.disconnect(); }
+      if (droneFilter) droneFilter.disconnect();
+      if (droneGain) droneGain.disconnect();
+    } catch (e) {}
+    droneOsc1 = null;
+    droneOsc2 = null;
+    droneFilter = null;
+    droneGain = null;
+    isDroneActive = false;
+  }
+
+  /**
    * 警告パルスの更新 (毎フレーム呼び出し)
-   * dangerRatio が 0.4 未満では鳴らさない。
-   * 0.4 → 1.0 に上がるにつれ、間隔 600ms → 80ms、音程 400Hz → 1200Hz。
+   * dangerRatio が 0.30 未満では鳴らさない。
+   * 0.30 → 1.0 に上がるにつれ、間隔 600ms → 80ms、音程 400Hz → 1200Hz。
    * @param {number} dangerRatio 現在の危険度比率 (0.0〜)
    * @param {number} dt 前フレームからの経過時間 (秒)
    */
   function updateWarningPulse(dangerRatio, dt) {
-    if (dangerRatio < 0.4) {
+    // ドローンのパラメータも毎フレーム滑らかに更新
+    updateDrone(dangerRatio);
+
+    if (dangerRatio < 0.30) {
       pulseTimer = 0;
       return;
     }
 
-    // 0.4 → 1.0 を 0.0 → 1.0 に正規化 (1.0以上もクランプ)
-    const norm = Math.max(0, Math.min(1.0, (dangerRatio - 0.4) / (1.0 - 0.4)));
+    // 0.30 → 1.0 を 0.0 → 1.0 に正規化 (1.0以上もクランプ)
+    const norm = Math.max(0, Math.min(1.0, (dangerRatio - 0.30) / (1.0 - 0.30)));
 
     // 間隔: 600ms (0.60s) → 80ms (0.08s)
     const interval = 0.60 - norm * (0.60 - 0.08);
@@ -169,89 +317,123 @@
   }
 
   /**
-   * ビッグバン音
-   * ホワイトノイズのバースト(ローパス下降) + 60Hz前後の低音サイン (300〜800ms)
+   * ビッグバン音 (全体約1.8秒の3層構成)
+   * 1. アタック層: ノイズ急降下 (12000Hz -> 200Hz, 0.12s, gain 0.85 -> 0.001)
+   * 2. ボディ層: サイン下降 (110Hz -> 28Hz, 0.9s, gain 0.80 ディケイ 1.4s)
+   * 3. テイル層: ノイズ余韻 (0.05s遅れ, 800Hz -> 60Hz, 1.8s, gain 0.45 -> 0.001)
    */
   function playBigBang() {
+    stopDrone(true);
     pulseTimer = 0;
     if (isMutedState || !audioCtx) return;
 
     try {
       const now = audioCtx.currentTime;
-      const duration = 0.65; // 約650ms
 
-      // 1. 低音サイン波 (Sub-bass: 70Hz -> 32Hz)
-      const subOsc = audioCtx.createOscillator();
-      const subGain = audioCtx.createGain();
-
-      subOsc.type = 'sine';
-      subOsc.frequency.setValueAtTime(70, now);
-      subOsc.frequency.exponentialRampToValueAtTime(32, now + duration);
-
-      subGain.gain.setValueAtTime(0.0001, now);
-      subGain.gain.linearRampToValueAtTime(0.55, now + 0.025);
-      subGain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-
-      subOsc.connect(subGain);
-      subGain.connect(masterGain);
-
-      subOsc.start(now);
-      subOsc.stop(now + duration + 0.02);
-
-      // 2. ホワイトノイズバースト (ローパスフィルター下降)
+      // 1. アタック層 (立ち上がりの「ドッ」: ノイズ + 急速下降ローパス)
       if (noiseBuffer) {
-        const noiseSource = audioCtx.createBufferSource();
-        noiseSource.buffer = noiseBuffer;
+        const attackSource = audioCtx.createBufferSource();
+        attackSource.buffer = noiseBuffer;
+        attackSource.loop = true;
 
-        const filter = audioCtx.createBiquadFilter();
-        filter.type = 'lowpass';
-        filter.frequency.setValueAtTime(2600, now);
-        filter.frequency.exponentialRampToValueAtTime(50, now + duration);
+        const attackFilter = audioCtx.createBiquadFilter();
+        attackFilter.type = 'lowpass';
+        attackFilter.frequency.setValueAtTime(12000, now);
+        attackFilter.frequency.exponentialRampToValueAtTime(200, now + 0.12);
 
-        const noiseGain = audioCtx.createGain();
-        noiseGain.gain.setValueAtTime(0.0001, now);
-        noiseGain.gain.linearRampToValueAtTime(0.5, now + 0.015);
-        noiseGain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+        const attackGain = audioCtx.createGain();
+        attackGain.gain.setValueAtTime(0.85, now);
+        attackGain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
 
-        noiseSource.connect(filter);
-        filter.connect(noiseGain);
-        noiseGain.connect(masterGain);
+        attackSource.connect(attackFilter);
+        attackFilter.connect(attackGain);
+        attackGain.connect(masterGain);
 
-        noiseSource.start(now);
-        noiseSource.stop(now + duration + 0.02);
+        attackSource.start(now);
+        attackSource.stop(now + 0.14);
+      }
+
+      // 2. ボディ層 (「ドー」: sineオシレーター 110Hz -> 28Hz, ディケイ 1.4秒)
+      const bodyOsc = audioCtx.createOscillator();
+      const bodyGain = audioCtx.createGain();
+
+      bodyOsc.type = 'sine';
+      bodyOsc.frequency.setValueAtTime(110, now);
+      bodyOsc.frequency.exponentialRampToValueAtTime(28, now + 0.9);
+
+      bodyGain.gain.setValueAtTime(0.0001, now);
+      bodyGain.gain.linearRampToValueAtTime(0.80, now + 0.005);
+      bodyGain.gain.exponentialRampToValueAtTime(0.0001, now + 1.4);
+
+      bodyOsc.connect(bodyGain);
+      bodyGain.connect(masterGain);
+
+      bodyOsc.start(now);
+      bodyOsc.stop(now + 1.45);
+
+      // 3. テイル層 (余韻の「ゴー…」: 0.05秒遅れで開始、ノイズ 800Hz -> 60Hz, 1.8秒)
+      if (noiseBuffer) {
+        const tailStartTime = now + 0.05;
+        const tailDuration = 1.8;
+
+        const tailSource = audioCtx.createBufferSource();
+        tailSource.buffer = noiseBuffer;
+        tailSource.loop = true;
+
+        const tailFilter = audioCtx.createBiquadFilter();
+        tailFilter.type = 'lowpass';
+        tailFilter.frequency.setValueAtTime(800, tailStartTime);
+        tailFilter.frequency.exponentialRampToValueAtTime(60, tailStartTime + tailDuration);
+
+        const tailGain = audioCtx.createGain();
+        tailGain.gain.setValueAtTime(0.0001, now);
+        tailGain.gain.setValueAtTime(0.45, tailStartTime);
+        tailGain.gain.exponentialRampToValueAtTime(0.001, tailStartTime + tailDuration);
+
+        tailSource.connect(tailFilter);
+        tailFilter.connect(tailGain);
+        tailGain.connect(masterGain);
+
+        tailSource.start(tailStartTime);
+        tailSource.stop(tailStartTime + tailDuration + 0.05);
       }
     } catch (e) {}
   }
 
   /**
    * リリース確定音
-   * 短く軽い上昇音
+   * triangle波による完全5度の和音 (440Hz + 660Hz)
+   * 長さ0.35秒、アタック15ms(やわらかく)、その後ゆるやかにディケイ
    */
   function playResolve() {
+    stopDrone();
     pulseTimer = 0;
     if (isMutedState || !audioCtx) return;
 
     try {
       const now = audioCtx.currentTime;
-      const duration = 0.14; // 140ms
+      const duration = 0.35;
+      const attack = 0.015;
 
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
+      const freqs = [440, 660];
+      for (let i = 0; i < freqs.length; i++) {
+        const freq = freqs[i];
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
 
-      // 明るく軽快なサイン波で音程を上昇 (520Hz -> 1040Hz: 1オクターブ上昇)
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(520, now);
-      osc.frequency.exponentialRampToValueAtTime(1040, now + duration * 0.85);
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, now);
 
-      gain.gain.setValueAtTime(0.0001, now);
-      gain.gain.linearRampToValueAtTime(0.22, now + 0.015);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.linearRampToValueAtTime(0.18, now + attack);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
 
-      osc.connect(gain);
-      gain.connect(masterGain);
+        osc.connect(gain);
+        gain.connect(masterGain);
 
-      osc.start(now);
-      osc.stop(now + duration + 0.01);
+        osc.start(now);
+        osc.stop(now + duration + 0.02);
+      }
     } catch (e) {}
   }
 
@@ -264,6 +446,9 @@
     playResolve: playResolve,
     toggleMute: toggleMute,
     isMuted: isMuted,
+    startDrone: startDrone,
+    stopDrone: stopDrone,
+    updateDrone: updateDrone,
   };
 
 })(window);

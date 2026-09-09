@@ -174,14 +174,22 @@ function startRound(now) {
   dangerStage = 'SAFE';
   shakeMagnitude = 0;
   flashOpacity = 0;
+
+  // 押下中の持続音(ドローン)を開始 (押した瞬間から鳴る)
+  if (window.AudioController && AudioController.startDrone) {
+    AudioController.startDrone();
+  }
 }
 
 function confirmRound() {
   if (!isPressing) return;
   isPressing = false;
 
-  // 警告パルス停止
+  // ドローン停止 & 警告パルス停止
   if (window.AudioController) {
+    if (AudioController.stopDrone) {
+      AudioController.stopDrone();
+    }
     AudioController.updateWarning(0, 0);
   }
 
@@ -217,8 +225,11 @@ function triggerBigBang() {
   flashOpacity = 0.95;
   shakeMagnitude = 22;
 
-  // 警告パルス停止 & ビッグバン爆発音再生
+  // ドローン停止 & 警告パルス停止 & ビッグバン爆発音再生
   if (window.AudioController) {
+    if (AudioController.stopDrone) {
+      AudioController.stopDrone();
+    }
     AudioController.updateWarning(0, 0);
     AudioController.playBigBang();
   }
