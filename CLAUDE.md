@@ -20,6 +20,7 @@
 - `docs/game-concept.md` — ゲーム仕様の正本(非公開情報を含む)
 - `docs/workflow.md` — データ共有方針・モデル別役割分担・委任呼び出し方法・モデル選択ログ運用
 - `docs/model-experiment-log.md` — モデル・effort別の成否と選択理由の記録(委任前に必ず確認)
+- `docs/dev-notes.md` — 他の文書に属さない実装中の気づき・保留事項・却下したアプローチの記録。「書くべきかどうか迷ったらここに書く」の位置づけ
 - `docs/cost-log.md` — discord-ai-hub経由Vertex AI(`xai/grok-4.6`等、月$10共有枠)を呼ぶたびに追記する
 - `AGENTS.md` — agy(Antigravity)がセッション開始時に自動で読む共通コンテキスト。実装・監査両方の基本方針・品質基準はここに定義してあり、`docs/workflow.md`と役割分担している
 
