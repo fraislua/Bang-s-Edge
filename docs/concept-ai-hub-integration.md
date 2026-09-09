@@ -129,3 +129,7 @@ Progress notificationsの実効性(§4項目8)は今回の検証範囲から意�
 進捗・知見は本ファイルの該当セクション(§1.2, §4, §6.2)に今後も追記していく想定。
 
 **接続確認(2026-09-10、セッション再起動後)**: `discord-ai-hub`の`ask`・`compare`・`models://registry`いずれもBang's-Edgeプロジェクトスコープで正常動作を確認(ローカルモデルのみ使用、課金なし)。`models://registry`には本書§1.1未記載のローカルモデルが2種追加されていた(`gemma-4-e4b-uncensored-hauhaucs-aggressive`、`qwen/qwen3.8-27b`、いずれも無料・データ共有なし)。
+
+**§4項目8(Progress notificationsの実効性)への回答(2026-09-10、実測)**: **Claude Code側のアイドルタイムアウトは、discord-ai-hubのProgress notificationsではリセットされない。** 3モデル(ローカル2種+`xai/grok-4.6`)にeffort=Highで`compare`を投げたところ、120秒でバックグラウンドタスクに移行した後、**326秒無応答として中断された**(`MCP server "discord-ai-hub" tool "compare" sent no response or progress for 326s; aborting`)。discord-ai-hub側が約3秒間隔でprogressを送る実装であっても、Claude Code側がそれをアイドル判定のリセットに使っていないか、`progressToken`が渡っていない。
+- **対処法**(エラーメッセージが提示): MCP設定にper-serverの`timeout`(ms)を設定するか、環境変数`CLAUDE_CODE_MCP_TOOL_IDLE_TIMEOUT`(ms、0で無効)を設定する。未設定のままでは長時間の`compare`は実質使えない。
+- **実務上の回避策**: モデル数を減らし、effortを下げ、`ask`で単体モデルに投げる。今回は`ask`+`xai/grok-4.6`+effort=Mediumで問題なく完了した。ローカルモデルは推論が遅く(疎通確認時点でqwenが26秒)、`compare`に混ぜると全体を押し上げる要因になる。
