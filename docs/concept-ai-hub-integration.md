@@ -133,3 +133,6 @@ Progress notificationsの実効性(§4項目8)は今回の検証範囲から意�
 **§4項目8(Progress notificationsの実効性)への回答(2026-09-10、実測)**: **Claude Code側のアイドルタイムアウトは、discord-ai-hubのProgress notificationsではリセットされない。** 3モデル(ローカル2種+`xai/grok-4.6`)にeffort=Highで`compare`を投げたところ、120秒でバックグラウンドタスクに移行した後、**326秒無応答として中断された**(`MCP server "discord-ai-hub" tool "compare" sent no response or progress for 326s; aborting`)。discord-ai-hub側が約3秒間隔でprogressを送る実装であっても、Claude Code側がそれをアイドル判定のリセットに使っていないか、`progressToken`が渡っていない。
 - **対処法**(エラーメッセージが提示): MCP設定にper-serverの`timeout`(ms)を設定するか、環境変数`CLAUDE_CODE_MCP_TOOL_IDLE_TIMEOUT`(ms、0で無効)を設定する。未設定のままでは長時間の`compare`は実質使えない。
 - **実務上の回避策**: モデル数を減らし、effortを下げ、`ask`で単体モデルに投げる。今回は`ask`+`xai/grok-4.6`+effort=Mediumで問題なく完了した。ローカルモデルは推論が遅く(疎通確認時点でqwenが26秒)、`compare`に混ぜると全体を押し上げる要因になる。
+- **本プロジェクトの方針(2026-09-10、ユーザー判断)**: タイムアウト問題の修正は本実験の終了後に行うこととし、**それまで`compare`は使わず、`ask`をモデルごとに個別に呼んで比較する**。
+
+**§4項目7(`compare`の`gpt-5.6-*`除外をどう徹底するか)への影響**: 上記により本プロジェクトでは`compare`を使わないため、当初懸念していた「配列から除外し忘れる」というリスク構造自体が発生しない。`ask`は1回1モデルなので、送信のたびに「このモデルにこの内容を送ってよいか」を明示的に判断することになり、**判断が暗黙にならない**という副次的な利点がある。ただしこれは`compare`の除外運用が可能かどうかの検証にはならないため、その検証はProject_Orbital側で別途行う必要がある。

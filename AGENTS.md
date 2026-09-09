@@ -14,7 +14,7 @@
 
 ## 文書体系
 
-- `docs/game-concept.md` — ゲームコンセプト(仕様の正本)。**⚠️この内容はOpenAIデータ共有モデル(discord-ai-hub経由の`gpt-5.6-*`)へ送らないこと**(`ask`/`compare`いずれも)。
+- `docs/game-concept.md` — ゲームコンセプト(仕様の正本)。**⚠️このうち「概要」「ゲームメカニクス」「スコアリング」「ラウンド構造」とタイトルは、OpenAIデータ共有モデル(discord-ai-hub経由の`gpt-5.6-*`)へ送らないこと。**「実装仕様」(数式・パラメータ・音響設計)は共有可(2026-09-10に範囲を緩和)。判断基準はプロンプト単体でゲームの内容が復元できるか。
 - `docs/workflow.md` — 開発・監査フロー、モデル別役割分担、データ共有方針
 - `docs/cost-log.md` — discord-ai-hub経由Vertex AI(月$10共有枠)の利用記録
 - `docs/concept-ai-hub-integration.md` — 本プロジェクトの位置づけ(discord-ai-hub MCP統合構想の実地検証)
