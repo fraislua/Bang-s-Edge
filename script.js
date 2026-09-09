@@ -89,6 +89,25 @@ function initParticles() {
 // 初期配置
 initParticles();
 
+// ミュートボタン領域定義 (右上に配置)
+const MUTE_BTN = {
+  size: 28,
+  marginRight: 18,
+  marginTop: 18,
+  getRect() {
+    return {
+      x: width - this.marginRight - this.size,
+      y: this.marginTop,
+      w: this.size,
+      h: this.size,
+    };
+  },
+  contains(px, py) {
+    const r = this.getRect();
+    return px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h;
+  }
+};
+
 // --- 4. マウス / ポインター入力 ---
 function getCanvasCoords(e) {
   const rect = canvas.getBoundingClientRect();
@@ -103,6 +122,20 @@ function handlePointerDown(e) {
   if (e.button !== undefined && e.button !== 0) return;
 
   const pos = getCanvasCoords(e);
+
+  // Web Audio API の初期化 / resume (自動再生ポリシー対策)
+  if (window.AudioController) {
+    AudioController.init();
+  }
+
+  // ミュートボタン上のクリック判定 (ラウンド開始として扱わず早期リターン)
+  if (MUTE_BTN.contains(pos.x, pos.y)) {
+    if (window.AudioController) {
+      AudioController.toggleMute();
+    }
+    return;
+  }
+
   cursorX = pos.x;
   cursorY = pos.y;
 
@@ -114,6 +147,13 @@ function handlePointerMove(e) {
   const pos = getCanvasCoords(e);
   cursorX = pos.x;
   cursorY = pos.y;
+
+  // ミュートボタン上ではカーソルをポインターにする
+  if (MUTE_BTN.contains(pos.x, pos.y)) {
+    canvas.style.cursor = 'pointer';
+  } else {
+    canvas.style.cursor = 'default';
+  }
 }
 
 function handlePointerUp(e) {
@@ -140,10 +180,18 @@ function confirmRound() {
   if (!isPressing) return;
   isPressing = false;
 
+  // 警告パルス停止
+  if (window.AudioController) {
+    AudioController.updateWarning(0, 0);
+  }
+
   if (gameState === 'ATTRACTING') {
     // 正常リリースで確定
     gameState = 'RESOLVED';
     finalScore = currentScore;
+    if (window.AudioController) {
+      AudioController.playResolve();
+    }
     if (finalScore > highScore) {
       highScore = finalScore;
       try {
@@ -168,6 +216,12 @@ function triggerBigBang() {
   graceCounter = 0;
   flashOpacity = 0.95;
   shakeMagnitude = 22;
+
+  // 警告パルス停止 & ビッグバン爆発音再生
+  if (window.AudioController) {
+    AudioController.updateWarning(0, 0);
+    AudioController.playBigBang();
+  }
 
   // 全粒子をカーソル中心から外側へ放射状に爆発飛散させる
   for (let i = 0; i < particles.length; i++) {
@@ -249,6 +303,11 @@ function update(dt, now) {
     currentDangerRatio = currentDensity / CONFIG.BANG_THRESHOLD;
     currentScore = Math.floor((currentDensity / CONFIG.DENSITY_MAX) * 9999);
 
+    // 警告パルスの更新 (毎フレーム currentDangerRatio を渡す)
+    if (window.AudioController) {
+      AudioController.updateWarning(currentDangerRatio, dt);
+    }
+
     // 危険度4段階の判定
     if (currentDangerRatio < CONFIG.DANGER_WARM) {
       dangerStage = 'SAFE';
@@ -275,7 +334,10 @@ function update(dt, now) {
     }
 
   } else {
-    // 待機中 / 確定後 / ビッグバン後
+    // 待機中 / 確定後 / ビッグバン後 (警告パルス停止)
+    if (window.AudioController) {
+      AudioController.updateWarning(0, dt);
+    }
     for (let i = 0; i < particles.length; i++) {
       const p = particles[i];
       p.inMeasure = false;
@@ -580,10 +642,10 @@ function drawHUD(now) {
   ctx.textAlign = 'left';
   ctx.fillText(`SCORE: ${displayScore.toString().padStart(4, '0')}`, 20, 36);
 
-  // 右上: ハイスコア
+  // 右上: ハイスコア (ミュートボタンの左側に適度な余白を空けて配置)
   ctx.textAlign = 'right';
   ctx.fillStyle = '#ffd700';
-  ctx.fillText(`HIGH: ${highScore.toString().padStart(4, '0')}`, width - 20, 36);
+  ctx.fillText(`HIGH: ${highScore.toString().padStart(4, '0')}`, width - MUTE_BTN.marginRight - MUTE_BTN.size - 14, 36);
   ctx.restore();
 
   // 3. 画面中央 / ガイドテキスト
@@ -627,6 +689,68 @@ function drawHUD(now) {
     ctx.fillStyle = '#94a3b8';
     ctx.fillText('CLICK TO RETRY', width / 2, height / 2 + 55);
   }
+  ctx.restore();
+
+  // 4. ミュート切替ボタン
+  drawMuteButton();
+}
+
+// ミュート切替ボタンのCanvas描画 (スピーカーのオン/オフ)
+function drawMuteButton() {
+  const rect = MUTE_BTN.getRect();
+  const isMuted = window.AudioController ? AudioController.isMuted() : false;
+
+  ctx.save();
+  // ボタン枠・半透明背景
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.7)';
+  drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 6);
+  ctx.fill();
+  ctx.strokeStyle = isMuted ? 'rgba(148, 163, 184, 0.4)' : 'rgba(0, 229, 255, 0.4)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // スピーカーアイコン
+  const cx = rect.x + rect.w / 2;
+  const cy = rect.y + rect.h / 2;
+  const iconColor = isMuted ? '#94a3b8' : '#00e5ff';
+
+  ctx.fillStyle = iconColor;
+  ctx.strokeStyle = iconColor;
+  ctx.lineWidth = 1.6;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  // スピーカーコーン部
+  ctx.beginPath();
+  const sx = cx - 6.5;
+  const sy = cy - 3.5;
+  ctx.moveTo(sx, sy);
+  ctx.lineTo(sx + 3, sy);
+  ctx.lineTo(sx + 6.5, cy - 6.5);
+  ctx.lineTo(sx + 6.5, cy + 6.5);
+  ctx.lineTo(sx + 3, cy + 3.5);
+  ctx.lineTo(sx, cy + 3.5);
+  ctx.closePath();
+  ctx.fill();
+
+  if (isMuted) {
+    // ミュート時: × マーク
+    ctx.beginPath();
+    ctx.moveTo(cx + 2.5, cy - 3.5);
+    ctx.lineTo(cx + 7.5, cy + 3.5);
+    ctx.moveTo(cx + 7.5, cy - 3.5);
+    ctx.lineTo(cx + 2.5, cy + 3.5);
+    ctx.stroke();
+  } else {
+    // オン時: 音波アーク
+    ctx.beginPath();
+    ctx.arc(cx + 2, cy, 4, -Math.PI / 3, Math.PI / 3, false);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx + 2, cy, 7.5, -Math.PI / 3.2, Math.PI / 3.2, false);
+    ctx.stroke();
+  }
+
   ctx.restore();
 }
 
