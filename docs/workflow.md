@@ -8,7 +8,7 @@
 
 ## 0. 位置づけ
 
-本書は、discord-ai-hub MCP統合構想(`docs/concept-ai-hub-integration.md`、元はProject_Orbitalで作成)の実地検証として、このリポジトリで採用する**軽量な運用ルール**を定義する。Project_Orbitalの`docs/development-workflow.md`のような大規模なN1〜N40規範は本プロジェクトには存在しない。ここでは検証に必要な最小限のルールのみを定める。
+本書は、discord-ai-hub MCP統合構想(`docs/concept-ai-hub-integration.md`、元は本番プロジェクトで作成)の実地検証として、このリポジトリで採用する**軽量な運用ルール**を定義する。本番プロジェクトの(本番側の開発フロー文書)のような大規模な詳細な実装規範は本プロジェクトには存在しない。ここでは検証に必要な最小限のルールのみを定める。
 
 ## 1. データ共有方針(2026-09-10に範囲を緩和)
 
@@ -51,12 +51,12 @@
 
 **呼び出し例(監査)**:
 ```
-agy --model gemini-3.8-flash-high --add-dir "C:\Users\ryoga\Documents\Bang's-Edge" -p "[監査] index.html / script.js のパーティクル集積ロジックをレビューしてください。"
+agy --model gemini-3.8-flash-high --add-dir "<このリポジトリの絶対パス>" -p "[監査] index.html / script.js のパーティクル集積ロジックをレビューしてください。"
 ```
 
 **呼び出し例(実装委任)**:
 ```
-agy --model claude-opus-4-6-thinking --add-dir "C:\Users\ryoga\Documents\Bang's-Edge" -p "[実装] docs/game-concept.mdの仕様に従い、パーティクルの集積範囲・強さの計算ロジックをscript.jsに実装してください。"
+agy --model claude-opus-4-6-thinking --add-dir "<このリポジトリの絶対パス>" -p "[実装] docs/game-concept.mdの仕様に従い、パーティクルの集積範囲・強さの計算ロジックをscript.jsに実装してください。"
 ```
 
 モデル・effortは呼び出しごとに選択し、`docs/model-experiment-log.md`の過去実績を参考にする。プロンプト冒頭に`[実装]`/`[監査]`のように役割を明示すると、AGENTS.mdの基本方針(実装時/監査時で挙動を分けている)と噛み合いやすい。レビュー観点・実装前提そのものを変えたい場合は`AGENTS.md`を編集する(プロンプト側で都度上書きも可能)。

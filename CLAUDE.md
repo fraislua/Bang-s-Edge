@@ -34,7 +34,7 @@
 常設のカスタムエージェント(`.agents/agents/...`)は使わない。以下の形で都度呼び出す(`--add-dir`を付けるとそのディレクトリの`AGENTS.md`が自動で読み込まれ、基本方針・品質基準が反映される)。プロンプト冒頭に`[実装]`/`[監査]`で役割を明示する:
 
 ```
-agy --model <model> --add-dir "C:\Users\ryoga\Documents\Bang's-Edge" -p "[実装|監査] <対象の指定>"
+agy --model <model> --add-dir "<このリポジトリの絶対パス>" -p "[実装|監査] <対象の指定>"
 ```
 
 モデル・effortは`docs/model-experiment-log.md`の実績を見て都度選ぶ。Vertex AI経由のモデルを使った場合は`docs/cost-log.md`にも記録する。
