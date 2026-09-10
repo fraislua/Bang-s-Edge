@@ -603,6 +603,13 @@ function draw(now) {
 
   // --- ワールド描画 (画面振動適用) ---
   ctx.save();
+  // 盤面の外(レターボックスの黒帯)へはみ出さないようクリップする。
+  // 集積円は最大半径1432pxまで育ち盤面を大きく超えるため、これが無いと帯の上まで描かれ、
+  // 見えない領域のラスタライズにも時間を使っていた。画面振動より前にクリップすること
+  // (盤面の境界そのものは揺れない)。
+  ctx.beginPath();
+  ctx.rect(0, 0, width, height);
+  ctx.clip();
   if (shakeMagnitude > 0) {
     const sx = (Math.random() * 2 - 1) * shakeMagnitude;
     const sy = (Math.random() * 2 - 1) * shakeMagnitude;
@@ -673,12 +680,17 @@ function drawFields(now) {
     : 'rgba(255, 255, 255, 0.03)';
   ctx.fill();
 
+  // 発光は shadowBlur ではなく「太く薄い縁取りを下に重ねる」方式で出す。
+  // 集積円は半径が最大1432論理px(周長9000px超)まで育つため、これに shadowBlur を掛けると
+  // 極端に高価になる。3440x1440 の実測で 165fps → 28fps まで落ち、しかも r(t) が増え続けるので
+  // ラウンド中ずっと下がり続けていた(危険度WARMで glowBlur=6 が入った瞬間から)。
+  if (glowBlur > 0) {
+    ctx.strokeStyle = glowColor;
+    ctx.lineWidth = circleWidth + glowBlur;
+    ctx.stroke();
+  }
   ctx.strokeStyle = circleColor;
   ctx.lineWidth = circleWidth;
-  if (glowBlur > 0) {
-    ctx.shadowColor = glowColor;
-    ctx.shadowBlur = glowBlur;
-  }
   ctx.stroke();
   ctx.restore();
 
@@ -747,12 +759,29 @@ function drawParticles() {
   ctx.globalAlpha = 1.0;
   ctx.restore();
 
+  // 発光層: shadowBlur ではなく「一回り大きい半透明の円」を下に敷いて表現する。
+  // shadowBlur はパス全体の外接矩形に適用されるため、粒子が1つでも遠くにあると
+  // 盤面全体をぼかすことになり極端に高価になる。集積円と同じ方式に揃える。
+  if (glowBlur > 0) {
+    ctx.save();
+    ctx.globalAlpha = 0.3;
+    ctx.fillStyle = glowColor;
+    ctx.beginPath();
+    const haloR = 2.2 + glowBlur * 0.45;
+    for (let i = 0; i < particles.length; i++) {
+      const p = particles[i];
+      if (!p.outOfReach) {
+        ctx.moveTo(p.x + haloR, p.y);
+        ctx.arc(p.x, p.y, haloR, 0, Math.PI * 2);
+      }
+    }
+    ctx.fill();
+    ctx.globalAlpha = 1.0;
+    ctx.restore();
+  }
+
   // 第2パス: 測定円外かつ射程内の粒子 (通常)
   ctx.save();
-  if (glowBlur > 0) {
-    ctx.shadowColor = glowColor;
-    ctx.shadowBlur = glowBlur;
-  }
   ctx.fillStyle = outerColor;
   ctx.beginPath();
   for (let i = 0; i < particles.length; i++) {
