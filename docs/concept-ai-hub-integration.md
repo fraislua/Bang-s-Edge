@@ -132,7 +132,9 @@ Progress notificationsの実効性(§4項目8)は今回の検証範囲から意�
 
 **接続確認(2026-09-10、セッション再起動後)**: `discord-ai-hub`の`ask`・`compare`・`models://registry`いずれもBang's-Edgeプロジェクトスコープで正常動作を確認(ローカルモデルのみ使用、課金なし)。`models://registry`には本書§1.1未記載のローカルモデルが2種追加されていた(`gemma-4-e4b-uncensored-hauhaucs-aggressive`、`qwen/qwen3.8-27b`、いずれも無料・データ共有なし)。
 
-**§4項目8(Progress notificationsの実効性)への回答(2026-09-10、実測)**: **Claude Code側のアイドルタイムアウトは、discord-ai-hubのProgress notificationsではリセットされない。** 3モデル(ローカル2種+`xai/grok-4.6`)にeffort=Highで`compare`を投げたところ、120秒でバックグラウンドタスクに移行した後、**326秒無応答として中断された**(`MCP server "discord-ai-hub" tool "compare" sent no response or progress for 326s; aborting`)。discord-ai-hub側が約3秒間隔でprogressを送る実装であっても、Claude Code側がそれをアイドル判定のリセットに使っていないか、`progressToken`が渡っていない。
+**§4項目8(Progress notificationsの実効性)への回答(2026-09-10、実測)**: > **【2026-09-10 訂正】以下の結論は誤りだった。Claude Code側のアイドルタイムアウトは Progress notifications で正しくリセットされる。** 実際の原因はサーバー側で、`compare`がモデル切替時にしか通知を送らず1モデルの生成中が無通知だったこと。サーバー側の処理停止は開始399秒後で、中断された326秒との差73秒が、通知でタイマーがリセットされていた証拠になる。サーバー側は約3秒間隔で常時通知を送るよう修正済み(`docs/mcp-feedback-response.md` C項)。**中断によるVertex AI枠の消費も無かった。** 以下は訂正前の記述:
+
+~~**Claude Code側のアイドルタイムアウトは、discord-ai-hubのProgress notificationsではリセットされない。**~~ 3モデル(ローカル2種+`xai/grok-4.6`)にeffort=Highで`compare`を投げたところ、120秒でバックグラウンドタスクに移行した後、**326秒無応答として中断された**(`MCP server "discord-ai-hub" tool "compare" sent no response or progress for 326s; aborting`)。discord-ai-hub側が約3秒間隔でprogressを送る実装であっても、Claude Code側がそれをアイドル判定のリセットに使っていないか、`progressToken`が渡っていない。
 - **対処法**(エラーメッセージが提示): MCP設定にper-serverの`timeout`(ms)を設定するか、環境変数`CLAUDE_CODE_MCP_TOOL_IDLE_TIMEOUT`(ms、0で無効)を設定する。未設定のままでは長時間の`compare`は実質使えない。
 - **実務上の回避策**: モデル数を減らし、effortを下げ、`ask`で単体モデルに投げる。今回は`ask`+`xai/grok-4.6`+effort=Mediumで問題なく完了した。ローカルモデルは推論が遅く(疎通確認時点でqwenが26秒)、`compare`に混ぜると全体を押し上げる要因になる。
 - **本プロジェクトの方針(2026-09-10、ユーザー判断)**: タイムアウト問題の修正は本実験の終了後に行うこととし、**それまで`compare`は使わず、`ask`をモデルごとに個別に呼んで比較する**。
