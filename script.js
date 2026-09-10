@@ -869,6 +869,14 @@ function drawHUD(now) {
     ctx.restore();
   }
 
+  // 描画性能の実測表示 (物理は固定ステップなので fps が落ちても挙動は変わらない)
+  ctx.save();
+  ctx.font = '10px monospace';
+  ctx.textAlign = 'left';
+  ctx.fillStyle = fpsEstimate < 50 ? 'rgba(255, 153, 153, 0.85)' : 'rgba(148, 163, 184, 0.55)';
+  ctx.fillText(`${Math.round(fpsEstimate)} fps`, 16, height - 16);
+  ctx.restore();
+
   // 2. スコア・ハイスコア表示
   ctx.save();
   ctx.font = 'bold 16px monospace';
@@ -994,15 +1002,42 @@ function drawMuteButton() {
 // --- 8. メインループ ---
 let lastTimestamp = 0;
 
+// 物理は常にこの固定ステップで進める。
+// 反発力(REPULSION_K)は硬く、明示的オイラー法では dt が 1/60 を超えると解けなくなる。
+// 実測では 40fps 相当の dt で塊が詰まらなくなり、ビッグバンが 0/10 で起きなくなった。
+// 描画のフレームレートと物理を切り離すことで、どの環境でも同じゲームになる。
+const FIXED_DT = 1 / 60;
+const MAX_SUBSTEPS = 5;   // 1フレームで進める上限 (遅い環境でのデススパイラル防止)
+let accumulator = 0;
+let simNow = 0;           // 物理が到達している時刻 (ms)
+let fpsEstimate = 60;     // 表示用の指数移動平均
+
 function loop(timestamp) {
-  if (!lastTimestamp) lastTimestamp = timestamp;
+  if (!lastTimestamp) {
+    lastTimestamp = timestamp;
+    simNow = timestamp;
+  }
   const rawDt = (timestamp - lastTimestamp) / 1000;
-  // フレームスキップやタブ復帰時の暴走を防ぐため dt をクランプ
-  const dt = Math.min(rawDt, 0.1);
   lastTimestamp = timestamp;
 
-  // 更新と描画
-  update(dt, timestamp);
+  if (rawDt > 0) fpsEstimate += (1 / rawDt - fpsEstimate) * 0.1;
+
+  // タブ復帰などで大きく飛んだ分は捨てる
+  accumulator += Math.min(rawDt, 0.25);
+
+  let steps = 0;
+  while (accumulator >= FIXED_DT && steps < MAX_SUBSTEPS) {
+    simNow += FIXED_DT * 1000;
+    update(FIXED_DT, simNow);
+    accumulator -= FIXED_DT;
+    steps++;
+  }
+  // 上限まで進めても追いつけない場合は残りを捨てる (スローモーションにはなるが破綻はしない)
+  if (accumulator >= FIXED_DT) {
+    accumulator = 0;
+    simNow = timestamp;
+  }
+
   draw(timestamp);
 
   requestAnimationFrame(loop);
