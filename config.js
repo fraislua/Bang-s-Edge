@@ -4,6 +4,10 @@
  */
 
 const CONFIG = {
+  // 論理盤面 (ウィンドウサイズによらずゲームはこの座標系で動く)
+  LOGICAL_WIDTH: 1920,
+  LOGICAL_HEIGHT: 1080,
+
   // 粒子設定
   TOTAL_PARTICLES: 200,      // 粒子総数
   MARGIN: 20,                // 初期配置の画面端マージン (px)

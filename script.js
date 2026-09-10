@@ -7,10 +7,17 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
-let width = window.innerWidth;
-let height = window.innerHeight;
+let width = CONFIG.LOGICAL_WIDTH;
+let height = CONFIG.LOGICAL_HEIGHT;
 let dpr = window.devicePixelRatio || 1;
 let effectiveRMax = 0;
+
+// 実際のウィンドウサイズと、論理盤面をそこへ収めるための変換
+let viewportW = 0;
+let viewportH = 0;
+let viewScale = 1;
+let viewOffsetX = 0;
+let viewOffsetY = 0;
 
 // 射程可視化用の状態
 let reachableCount = CONFIG.TOTAL_PARTICLES;  // 集積半径の上限内にある粒子数
@@ -21,17 +28,23 @@ const REQUIRED_PARTICLES = Math.ceil(CONFIG.BANG_THRESHOLD * CONFIG.MEASURE_AREA
 
 function resize() {
   dpr = window.devicePixelRatio || 1;
-  width = window.innerWidth;
-  height = window.innerHeight;
+  viewportW = window.innerWidth;
+  viewportH = window.innerHeight;
 
-  // 画面対角線長に基づく実効的な集積半径上限の計算
+  // 論理盤面のサイズは固定
+  width = CONFIG.LOGICAL_WIDTH;
+  height = CONFIG.LOGICAL_HEIGHT;
+
+  // 論理盤面がはみ出さない最大倍率と、中央寄せのための余白
+  viewScale = Math.min(viewportW / width, viewportH / height);
+  viewOffsetX = (viewportW - width * viewScale) / 2;
+  viewOffsetY = (viewportH - height * viewScale) / 2;
+
+  // 集積半径の上限は論理盤面の対角線から決まるので、以後は定数になる
   effectiveRMax = Math.hypot(width, height) * CONFIG.R_MAX_RATIO;
 
-  canvas.width = Math.floor(width * dpr);
-  canvas.height = Math.floor(height * dpr);
-
-  // devicePixelRatio に応じたスケール設定
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  canvas.width = Math.floor(viewportW * dpr);
+  canvas.height = Math.floor(viewportH * dpr);
 }
 
 window.addEventListener('resize', resize);
@@ -166,8 +179,8 @@ const MUTE_BTN = {
 function getCanvasCoords(e) {
   const rect = canvas.getBoundingClientRect();
   return {
-    x: e.clientX - rect.left,
-    y: e.clientY - rect.top,
+    x: (e.clientX - rect.left - viewOffsetX) / viewScale,
+    y: (e.clientY - rect.top - viewOffsetY) / viewScale,
   };
 }
 
@@ -576,8 +589,15 @@ function drawRoundedRect(targetCtx, x, y, w, h, radius) {
 }
 
 function draw(now) {
-  // キャンバスクリア
+  // 1. キャンバス全体を実ピクセルでクリア (レターボックスの帯)
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(0, 0, viewportW, viewportH);
+
+  // 2. 以降はすべて論理座標で描く
+  ctx.setTransform(dpr * viewScale, 0, 0, dpr * viewScale, dpr * viewOffsetX, dpr * viewOffsetY);
+
+  // 3. 盤面の背景
   ctx.fillStyle = '#05060a';
   ctx.fillRect(0, 0, width, height);
 
@@ -607,6 +627,11 @@ function draw(now) {
 
   // --- HUD描画 (画面上部に固定表示) ---
   drawHUD(now);
+
+  // 盤面の境界線 (レターボックスとの境目を示す)
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(1, 1, width - 2, height - 2);
 }
 
 // 集積円と固定測定円の描画
