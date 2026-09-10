@@ -12,6 +12,13 @@ let height = window.innerHeight;
 let dpr = window.devicePixelRatio || 1;
 let effectiveRMax = 0;
 
+// 射程可視化用の状態
+let reachableCount = CONFIG.TOTAL_PARTICLES;  // 集積半径の上限内にある粒子数
+let bangPossible = true;                       // 現在位置から到達可能か
+let unreachableFrames = 0;                     // 射程内が必要数を下回り続けたフレーム数
+const UNREACHABLE_WARN_FRAMES = 45;            // 警告を出すまでの猶予 (約0.75秒)
+const REQUIRED_PARTICLES = Math.ceil(CONFIG.BANG_THRESHOLD * CONFIG.MEASURE_AREA);  // 170
+
 function resize() {
   dpr = window.devicePixelRatio || 1;
   width = window.innerWidth;
@@ -66,22 +73,69 @@ let flashOpacity = 0;
 // 引力圏外粒子の微弱ランダム揺動の加速度 (px/s²)
 const JITTER_FORCE = 35;
 
-// --- 3. 粒子プール (TOTAL_PARTICLES個) ---
+// --- 3. 粒子プール (TOTAL_PARTICLES個) と反発計算バッファ ---
 const particles = [];
+const repAx = new Float64Array(CONFIG.TOTAL_PARTICLES);
+const repAy = new Float64Array(CONFIG.TOTAL_PARTICLES);
+
+// Box-Muller法による標準正規乱数
+function gaussRandom() {
+  let u = 0, v = 0;
+  while (u === 0) u = Math.random();
+  while (v === 0) v = Math.random();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
 
 function initParticles() {
   particles.length = 0;
   const margin = CONFIG.MARGIN;
   const spawnW = Math.max(width - 2 * margin, 20);
   const spawnH = Math.max(height - 2 * margin, 20);
+  const minX = margin;
+  const maxX = Math.max(margin, width - margin);
+  const minY = margin;
+  const maxY = Math.max(margin, height - margin);
 
-  for (let i = 0; i < CONFIG.TOTAL_PARTICLES; i++) {
+  const total = CONFIG.TOTAL_PARTICLES;
+  const uniformCount = Math.round(total * CONFIG.SPAWN_UNIFORM_FRAC);
+  const clusterTotal = total - uniformCount;
+
+  // 1. 一様ランダム配置
+  for (let i = 0; i < uniformCount; i++) {
     particles.push({
       x: margin + Math.random() * spawnW,
       y: margin + Math.random() * spawnH,
       vx: 0, // 初速 0
       vy: 0,
       inMeasure: false,
+      outOfReach: false,
+    });
+  }
+
+  // 2. クラスタ中心の生成 (画面内 MARGIN を除いた範囲の一様ランダム)
+  const clusters = [];
+  for (let c = 0; c < CONFIG.SPAWN_CLUSTERS; c++) {
+    clusters.push({
+      x: margin + Math.random() * spawnW,
+      y: margin + Math.random() * spawnH,
+    });
+  }
+
+  // 3. クラスタ配置 (残りの粒子を各クラスタに均等に振り分け、2次元正規分布)
+  for (let i = 0; i < clusterTotal; i++) {
+    const cluster = clusters[i % CONFIG.SPAWN_CLUSTERS];
+    const rawX = cluster.x + gaussRandom() * CONFIG.SPAWN_SIGMA;
+    const rawY = cluster.y + gaussRandom() * CONFIG.SPAWN_SIGMA;
+    const clampedX = Math.min(Math.max(rawX, minX), maxX);
+    const clampedY = Math.min(Math.max(rawY, minY), maxY);
+
+    particles.push({
+      x: clampedX,
+      y: clampedY,
+      vx: 0,
+      vy: 0,
+      inMeasure: false,
+      outOfReach: false,
     });
   }
 }
@@ -174,6 +228,12 @@ function startRound(now) {
   dangerStage = 'SAFE';
   shakeMagnitude = 0;
   flashOpacity = 0;
+  reachableCount = CONFIG.TOTAL_PARTICLES;
+  bangPossible = true;
+  unreachableFrames = 0;
+  for (let i = 0; i < particles.length; i++) {
+    particles[i].outOfReach = false;
+  }
 
   // 押下中の持続音(ドローン)を開始 (押した瞬間から鳴る)
   if (window.AudioController && AudioController.startDrone) {
@@ -184,6 +244,12 @@ function startRound(now) {
 function confirmRound() {
   if (!isPressing) return;
   isPressing = false;
+  reachableCount = CONFIG.TOTAL_PARTICLES;
+  bangPossible = true;
+  unreachableFrames = 0;
+  for (let i = 0; i < particles.length; i++) {
+    particles[i].outOfReach = false;
+  }
 
   // ドローン停止 & 警告パルス停止
   if (window.AudioController) {
@@ -224,6 +290,12 @@ function triggerBigBang() {
   graceCounter = 0;
   flashOpacity = 0.95;
   shakeMagnitude = 22;
+  reachableCount = CONFIG.TOTAL_PARTICLES;
+  bangPossible = true;
+  unreachableFrames = 0;
+  for (let i = 0; i < particles.length; i++) {
+    particles[i].outOfReach = false;
+  }
 
   // ドローン停止 & 警告パルス停止 & ビッグバン爆発音再生
   if (window.AudioController) {
@@ -259,47 +331,129 @@ function update(dt, now) {
   if (gameState === 'ATTRACTING') {
     const t = Math.max(0, (now - pressStartTime) / 1000);
 
-    // 指数飽和曲線による集積半径 r(t) と引力 F(t) の計算
+    // 指数飽和曲線による集積半径 r(t) と引力 F(t) の計算 (引力に F_CREEP を加算)
     const currentR = CONFIG.R_MIN + (effectiveRMax - CONFIG.R_MIN) * (1 - Math.exp(-t / CONFIG.TAU_R));
-    const currentF = CONFIG.F_MIN + (CONFIG.F_MAX - CONFIG.F_MIN) * (1 - Math.exp(-t / CONFIG.TAU_F));
+    const currentF = CONFIG.F_MIN + (CONFIG.F_MAX - CONFIG.F_MIN) * (1 - Math.exp(-t / CONFIG.TAU_F)) + CONFIG.F_CREEP * t;
+
+    // 引力の中心をカーソルから微小に揺動
+    const attractX = cursorX + CONFIG.WOBBLE_AX * Math.cos(2 * Math.PI * CONFIG.WOBBLE_F1 * t);
+    const attractY = cursorY + CONFIG.WOBBLE_AY * Math.sin(2 * Math.PI * CONFIG.WOBBLE_F2 * t);
+
+    // 粒子間反発の加速度を集計 (Float64Arrayバッファ再利用)
+    repAx.fill(0);
+    repAy.fill(0);
+    const d0 = CONFIG.REPULSION_D0;
+    const d0Sq = d0 * d0;
+    const eps = CONFIG.REPULSION_EPS;
+    const k = CONFIG.REPULSION_K;
+
+    for (let i = 0; i < particles.length; i++) {
+      const pi = particles[i];
+      for (let j = i + 1; j < particles.length; j++) {
+        const pj = particles[j];
+        const dx = pj.x - pi.x;
+        if (dx > d0 || dx < -d0) continue;
+        const dy = pj.y - pi.y;
+        if (dy > d0 || dy < -d0) continue;
+        const d2 = dx * dx + dy * dy;
+        if (d2 >= d0Sq) continue;
+
+        const d = Math.sqrt(d2);
+        const mag = k * (1 - Math.max(d, eps) / d0);
+        let ux, uy;
+        if (d >= eps) {
+          ux = dx / d;
+          uy = dy / d;
+        } else {
+          // 粒子が完全に重なっている: 添字から決まる固定方向を使う (Math.randomは使わない)
+          const h = ((i * 73856093) ^ (j * 19349663)) >>> 0;
+          const ang = (h % 62832) / 10000;
+          ux = Math.cos(ang);
+          uy = Math.sin(ang);
+        }
+
+        repAx[i] -= ux * mag;
+        repAy[i] -= uy * mag;
+        repAx[j] += ux * mag;
+        repAy[j] += uy * mag;
+      }
+    }
 
     const rMeasureSq = CONFIG.R_MEASURE * CONFIG.R_MEASURE;
     const currentRSq = currentR * currentR;
+    const reachSq = effectiveRMax * effectiveRMax;
     let nMeasure = 0;
+    let nReach = 0;
 
     for (let i = 0; i < particles.length; i++) {
       const p = particles[i];
-      const dx = cursorX - p.x;
-      const dy = cursorY - p.y;
-      const distSq = dx * dx + dy * dy;
 
-      // 固定測定円 R_MEASURE 内の判定
-      if (distSq <= rMeasureSq) {
+      // 固定測定円 R_MEASURE 内の判定 (※重要: 生の cursorX / cursorY を中心に行う)
+      const mdx = cursorX - p.x;
+      const mdy = cursorY - p.y;
+      const mDistSq = mdx * mdx + mdy * mdy;
+
+      if (mDistSq <= rMeasureSq) {
         p.inMeasure = true;
         nMeasure++;
       } else {
         p.inMeasure = false;
       }
 
-      // 粒子の運動更新
-      if (distSq <= currentRSq) {
-        // 引力圏内: カーソル方向への加速
-        const dist = Math.sqrt(distSq);
-        const effectiveDist = Math.max(dist, 1.0);
-        const dirX = dx / effectiveDist;
-        const dirY = dy / effectiveDist;
-
-        p.vx += dirX * currentF * dt;
-        p.vy += dirY * currentF * dt;
+      if (mDistSq <= reachSq) {
+        p.outOfReach = false;
+        nReach++;
       } else {
-        // 引力圏外: 微弱なランダム揺動
-        p.vx += (Math.random() - 0.5) * 2 * JITTER_FORCE * dt;
-        p.vy += (Math.random() - 0.5) * 2 * JITTER_FORCE * dt;
+        p.outOfReach = true;
       }
 
-      // 速度減衰 (DAMPING: 必須)
-      p.vx *= dampFactor;
-      p.vy *= dampFactor;
+      // 粒子の合成加速度の計算
+      let accX = 0;
+      let accY = 0;
+
+      // 引力中心 (attractX, attractY) からの距離と集積判定
+      const adx = attractX - p.x;
+      const ady = attractY - p.y;
+      const aDistSq = adx * adx + ady * ady;
+
+      if (aDistSq <= currentRSq) {
+        // 引力圏内: 引力中心方向への加速 (距離の下限クリップ 1.0 は従来どおり)
+        const aDist = Math.sqrt(aDistSq);
+        const effectiveDist = Math.max(aDist, 1.0);
+        const dirX = adx / effectiveDist;
+        const dirY = ady / effectiveDist;
+
+        accX += dirX * currentF;
+        accY += dirY * currentF;
+      } else {
+        // 引力圏外: 微弱なランダム揺動 (Math.random() の加速度)
+        accX += (Math.random() - 0.5) * 2 * JITTER_FORCE;
+        accY += (Math.random() - 0.5) * 2 * JITTER_FORCE;
+      }
+
+      // 粒子間反発加速度を加算
+      accX += repAx[i];
+      accY += repAy[i];
+
+      // 合成加速度のクリッピング (ACCEL_CLIP)
+      const accMag = Math.hypot(accX, accY);
+      if (accMag > CONFIG.ACCEL_CLIP) {
+        const accScale = CONFIG.ACCEL_CLIP / accMag;
+        accX *= accScale;
+        accY *= accScale;
+      }
+
+      // 速度更新と減衰 (減衰の掛かる順序は現行と同じ: (v + a*dt) * dampFactor)
+      p.vx = (p.vx + accX * dt) * dampFactor;
+      p.vy = (p.vy + accY * dt) * dampFactor;
+
+      // 速度上限クリッピング (VELOCITY_CLIP)
+      const vMag = Math.hypot(p.vx, p.vy);
+      if (vMag > CONFIG.VELOCITY_CLIP) {
+        const vScale = CONFIG.VELOCITY_CLIP / vMag;
+        p.vx *= vScale;
+        p.vy *= vScale;
+      }
 
       // 位置更新
       p.x += p.vx * dt;
@@ -307,6 +461,17 @@ function update(dt, now) {
 
       // 画面端で反射
       handleBoundaryBounce(p);
+    }
+
+    reachableCount = nReach;
+    // 粒子が動く過程で一時的に下回ることがあるため、持続して初めて警告する
+    // (下回った状態が続いたときだけ警告し、回復したら即座に解除する非対称な判定)
+    if (nReach >= REQUIRED_PARTICLES) {
+      unreachableFrames = 0;
+      bangPossible = true;
+    } else {
+      unreachableFrames++;
+      if (unreachableFrames >= UNREACHABLE_WARN_FRAMES) bangPossible = false;
     }
 
     // 密度計算 (※厳守: 分母は集積半径 r(t) ではなく固定の R_MEASURE)
@@ -541,7 +706,23 @@ function drawParticles() {
     glowColor = '#ff0033';
   }
 
-  // 圏外粒子 (通常)
+  // 第1パス: 射程外粒子 (暗く表示、影なし)
+  ctx.save();
+  ctx.globalAlpha = 0.25;
+  ctx.fillStyle = '#64748b';
+  ctx.beginPath();
+  for (let i = 0; i < particles.length; i++) {
+    const p = particles[i];
+    if (p.outOfReach) {
+      ctx.moveTo(p.x + 2.2, p.y);
+      ctx.arc(p.x, p.y, 2.2, 0, Math.PI * 2);
+    }
+  }
+  ctx.fill();
+  ctx.globalAlpha = 1.0;
+  ctx.restore();
+
+  // 第2パス: 測定円外かつ射程内の粒子 (通常)
   ctx.save();
   if (glowBlur > 0) {
     ctx.shadowColor = glowColor;
@@ -551,14 +732,14 @@ function drawParticles() {
   ctx.beginPath();
   for (let i = 0; i < particles.length; i++) {
     const p = particles[i];
-    if (!p.inMeasure) {
+    if (!p.inMeasure && !p.outOfReach) {
       ctx.moveTo(p.x + 2.2, p.y);
       ctx.arc(p.x, p.y, 2.2, 0, Math.PI * 2);
     }
   }
   ctx.fill();
 
-  // 測定円内粒子 (ハイライト)
+  // 第3パス: 測定円内粒子 (ハイライト)
   ctx.fillStyle = innerColor;
   ctx.beginPath();
   for (let i = 0; i < particles.length; i++) {
@@ -642,6 +823,26 @@ function drawHUD(now) {
   ctx.textAlign = 'center';
   ctx.fillText(stageText, width / 2, barY - 8);
   ctx.restore();
+
+  // 射程可視化表示 (ATTRACTING時のみ)
+  if (gameState === 'ATTRACTING') {
+    ctx.save();
+    ctx.textAlign = 'center';
+
+    // 1行目: 射程内粒子数
+    ctx.font = 'bold 11px monospace';
+    ctx.fillStyle = bangPossible ? 'rgba(148, 163, 184, 0.9)' : '#ff4444';
+    ctx.fillText(`射程内 ${reachableCount} / ${CONFIG.TOTAL_PARTICLES}  (必要 ${REQUIRED_PARTICLES})`, width / 2, barY + barH + 32);
+
+    // 2行目: 到達不能警告 (bangPossible === false のときのみ)
+    if (!bangPossible) {
+      ctx.font = 'bold 12px monospace';
+      ctx.fillStyle = (Math.floor(now / 400) % 2 === 0) ? '#ff4444' : '#ff9999';
+      ctx.fillText('この位置では到達不能 — 画面の中央へ', width / 2, barY + barH + 48);
+    }
+
+    ctx.restore();
+  }
 
   // 2. スコア・ハイスコア表示
   ctx.save();

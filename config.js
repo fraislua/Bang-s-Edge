@@ -20,7 +20,24 @@ const CONFIG = {
   TAU_F: 2.5,                // 引力の時定数 (s) ※TAU_F < TAU_R
 
   // 運動・減衰
-  DAMPING: 0.92,             // 速度減衰 (毎フレーム)
+  DAMPING: 0.975,            // 速度減衰 (毎フレーム)
+
+  // 物理拡張: 粒子間反発・引力上昇・揺動・クリップ
+  F_CREEP: 80,              // 引力の際限ない上昇 (px/s^3)。F(t) に + F_CREEP * t として加算。30では1ラウンド22秒かかり学習が遅すぎた
+  REPULSION_K: 4000,        // 粒子間反発の係数 (px/s^2)
+  REPULSION_D0: 8,          // 粒子間反発の相互作用半径 (px)
+  REPULSION_EPS: 0.05,      // 反発の方向が定義できない最小距離 (px)
+  ACCEL_CLIP: 8000,         // 1粒子あたりの合成加速度の上限 (px/s^2)
+  VELOCITY_CLIP: 720,       // 速度の上限 (px/s)
+  WOBBLE_AX: 12,            // 引力中心の揺動振幅 X (px)
+  WOBBLE_AY: 9,             // 引力中心の揺動振幅 Y (px)
+  WOBBLE_F1: 0.73,          // 揺動周波数 X (Hz)
+  WOBBLE_F2: 0.97,          // 揺動周波数 Y (Hz)
+
+  // 初期配置
+  SPAWN_CLUSTERS: 5,        // 初期配置のクラスタ数
+  SPAWN_SIGMA: 55,          // 各クラスタの標準偏差 (px)
+  SPAWN_UNIFORM_FRAC: 0.35, // 一様に撒く粒子の割合
 
   // ビッグバン判定
   BANG_GRACE_FRAMES: 5,      // 猶予フレーム数 (約83ms)
