@@ -27,6 +27,7 @@
 - `docs/workflow.md` — データ共有方針・モデル別役割分担・委任呼び出し方法・モデル選択ログ運用
 - `docs/model-experiment-log.md` — モデル・effort別の成否と選択理由の記録(委任前に必ず確認)
 - `docs/dev-notes.md` — 他の文書に属さない実装中の気づき・保留事項・却下したアプローチの記録。「書くべきかどうか迷ったらここに書く」の位置づけ
+- **`.claude/skills/discord-ai-hub/SKILL.md` — discord-ai-hubの`ask`/`compare`を呼ぶ前に必ず読む。** 呼び出し前後の確認項目(送信可否・モデル選択・`null`の渡し方・途中切れ・記録)をここに一本化してある。スキルとして自動で読み込まれなかった場合も、呼ぶ前に直接読む
 - `docs/MCP_AGENT_GUIDE.md` — discord-ai-hub MCPサーバーの利用ガイド(**サーバー側が配布する正本**)。モデル一覧・引数・無料枠・応答が不完全な場合の挙動
 - `docs/mcp-feedback.md` / `docs/mcp-feedback-response.md` — MCPサーバーへの不具合報告と、それへの回答(決着済み)。**こちらの原因推定が誤っていた点の訂正表を含む**
 - `docs/cost-log.md` — discord-ai-hub経由Vertex AI(`xai/grok-4.6`等、月$10共有枠)を呼ぶたびに追記する
