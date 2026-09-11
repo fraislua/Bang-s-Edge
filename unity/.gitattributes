@@ -1,0 +1,19 @@
+# Unity writes its text assets (scenes, prefabs, .asset, .meta) with LF.
+# Pin LF here so core.autocrlf on Windows does not turn every save into a
+# line-ending-only diff. Scoped to the Unity project; the web version at the
+# repository root keeps its existing behaviour.
+* text=auto eol=lf
+
+# Binary assets Git should never try to diff or convert.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.psd binary
+*.tga binary
+*.exr binary
+*.wav binary
+*.mp3 binary
+*.ogg binary
+*.fbx binary
+*.ttf binary
+*.otf binary
