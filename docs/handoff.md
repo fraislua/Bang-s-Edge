@@ -24,16 +24,16 @@
   - 起動時のUnityロゴ画面を外した
   - **unityroomランキング**: ボード1=確定したスコア(降順)、ボード2=押してから爆発までの秒(昇順、小数点以下2桁)。ラウンドごとに自動送信。爆発画面にBANG TIMEと自己ベスト
 
-### スマホ対応(2026-09-11着手、未公開)
+### スマホ対応(2026-09-11、unityroomに公開済み。ユーザーがスマホで動作と表示を確認)
 
-- 決定と理由は`docs/unity-port-plan.md` §5-10(指の少し上に集める・横向き前提・実機はAndroidのChrome)。
-- **公開中の版はタッチでは遊べない**(長押ししてもラウンドが始まらない。ヘッドレスChromeのタッチ再現で確認、`docs/dev-notes.md`)。
+- 決定と理由は`docs/unity-port-plan.md` §5-10(指の少し上に集める・実機はAndroidのChrome。当初の「横向き前提」は、unityroomでは縦向きの判定が働かないと分かり、ユーザー判断で外した)。
+- **対応前の公開版はタッチでは遊べなかった**(長押ししてもラウンドが始まらない。ヘッドレスChromeのタッチ再現で確認、`docs/dev-notes.md`)。
 - 入れたもの: 入力を`Pointer.current`に / タッチのときだけ引き寄せる点を指の60 CSS px上へ(`GameManager.TOUCH_CURSOR_OFFSET_CSS_PX`、試遊で調整) / ミュートとスライダーの当たり判定を上下に44 CSS pxまで拡大 / 案内文をTOUCH・TAPに切り替え / 描画の解像度を端末の値に戻す(`pixel-ratio.jspre`、unityroomがスマホで1倍に固定するため) / `touch-gestures.jspre`(長押しの文字選択・メニュー、スクロール、タップ後の疑似マウスを抑止) / `audio-unlock.jspre`(指を離したときにも音を開始) / `BangsDisplay.jslib`(キャンバスのCSS倍率とcoarse pointer)。
 - **ヘッドレスChromeのタッチ再現**(`node tools/web-shot/cdp-touch-check.mjs <url> <outDir> <name> [width] [height] [dpr]`)と、**AndroidのChrome実機**(ユーザーの古めの端末。iPhoneは無いのでiOSは確認できない)で確認済み: 読み込み・TOUCH/TAPの文言・ずらす量(60 CSS pxで問題なし)・長押しで文字選択やスクロールが出ない・音(1回目は離すまで鳴らず、2回目から鳴る)・ボタン・縦向きの案内と復帰。
 - **実機でアドレスバーに画面の下(fps)が隠れた** → テンプレートのキャンバスの高さ`100vh`を`100%`+`100dvh`に直して解消(`docs/dev-notes.md`)。**これは手元の確認用ページだけの修正で、unityroomは自前のページを使う。**
 - 実機への配信は`python -m http.server 8770 --bind 0.0.0.0 --directory <ビルド>`で、スマホから`http://192.168.0.53:8770/`(PCの有線LAN。Pythonの受信許可はプライベート・パブリック両方に登録済み)。
 - **unityroomに投稿してユーザーが確認した(1回目)**: 縦向きのまま遊べた / 横にすると画質が落ちた。原因はunityroomのゲームページで、スマホでは描画を1倍の解像度に固定し、キャンバスは縦向きでも横長で置く(`docs/dev-notes.md`)。**ユーザー判断で縦向きの判定と案内を外し**、`pixel-ratio.jspre`で解像度を端末の値(上限3)に戻した。unityroomのページを写した確認用ページは`unity/Build/WebGL/ur-test.html`(ビルドで上書きされないが、Buildフォルダを消すと消える。gitの対象外)。
-- **次: 修正を入れたビルドをユーザーがunityroomへ出し直し、画質と動き(fps)を見る。** unityroomのページの黒帯や配置はビルドからは変えない。表示の大きさに不満が出たら、ゲーム内の全画面ボタン(AndroidのChromeならボタンを押したときに全画面にできる)などを検討する。
+- **修正版をunityroomへ出し直し、ユーザーがスマホで動作と表示を確認した**(横向きでも画質が落ちず、縦向きでも遊べる)。unityroomのページの黒帯や配置はビルドからは変えない。表示の大きさに不満が出たら、ゲーム内の全画面ボタン(AndroidのChromeならボタンを押したときに全画面にできる)などを検討する。**iPhoneでの挙動は未確認**(確かめる端末が無い)。
 
 ### unityroomへ公開ビルドを出す手順(次の更新でもこのとおりにする)
 
