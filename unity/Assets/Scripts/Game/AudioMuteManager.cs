@@ -3,17 +3,19 @@ using UnityEngine;
 namespace BangsEdge.Game
 {
     /// <summary>
-    /// ミュート状態の管理および永続化を担当する静的クラス。
-    /// JS版 audio.js の STORAGE_KEY_MUTED ('bangs_edge_muted') に準拠。
+    /// ミュート状態および音量の管理・永続化を担当する静的クラス。
+    /// JS版 audio.js の STORAGE_KEY_MUTED ('bangs_edge_muted') および STORAGE_KEY_VOLUME ('bangs_edge_volume') に準拠。
     /// WebGL環境では audio.js (localStorage) の状態を正として同期し、
     /// エディタおよび非WebGL環境では PlayerPrefs を用いて永続化する。
     /// </summary>
     public static class AudioMuteManager
     {
         public const string STORAGE_KEY_MUTED = "bangs_edge_muted";
+        public const string STORAGE_KEY_VOLUME = "bangs_edge_volume";
 
 #if !UNITY_WEBGL || UNITY_EDITOR
         private static bool _isMuted;
+        private static float _volume = 1f;
         private static bool _isLoaded;
 #endif
 
@@ -34,6 +36,23 @@ namespace BangsEdge.Game
             }
         }
 
+        /// <summary>
+        /// 現在のマスター音量 (0.0〜1.0) を取得する。
+        /// WebGL環境では audio.js の状態を返し、それ以外では PlayerPrefs の値を返す。
+        /// </summary>
+        public static float Volume
+        {
+            get
+            {
+#if UNITY_WEBGL && !UNITY_EDITOR
+                return WebAudioEvents.GetVolume();
+#else
+                EnsureLoaded();
+                return _volume;
+#endif
+            }
+        }
+
 #if !UNITY_WEBGL || UNITY_EDITOR
         /// <summary>
         /// 初回アクセス時に PlayerPrefs から状態を復元する (エディタ・非WebGL用)。
@@ -45,6 +64,7 @@ namespace BangsEdge.Game
             // JS版の localStorage と同様、"true" という文字列ならミュート有効
             string saved = PlayerPrefs.GetString(STORAGE_KEY_MUTED, "false");
             _isMuted = (saved == "true");
+            _volume = Mathf.Clamp01(PlayerPrefs.GetFloat(STORAGE_KEY_VOLUME, 1f));
             _isLoaded = true;
         }
 #endif
@@ -83,6 +103,22 @@ namespace BangsEdge.Game
             _isMuted = muted;
             PlayerPrefs.SetString(STORAGE_KEY_MUTED, _isMuted ? "true" : "false");
             PlayerPrefs.Save();
+#endif
+        }
+
+        /// <summary>
+        /// マスター音量を設定する (0.0〜1.0)。
+        /// WebGL環境では WebAudioEvents.SetVolume を呼び出し、それ以外では PlayerPrefs を更新する (Saveは呼ばない)。
+        /// </summary>
+        public static void SetVolume(float volume)
+        {
+            float clamped = Mathf.Clamp01(volume);
+#if UNITY_WEBGL && !UNITY_EDITOR
+            WebAudioEvents.SetVolume(clamped);
+#else
+            EnsureLoaded();
+            _volume = clamped;
+            PlayerPrefs.SetFloat(STORAGE_KEY_VOLUME, clamped);
 #endif
         }
     }

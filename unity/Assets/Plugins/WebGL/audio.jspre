@@ -9,12 +9,14 @@
 
   // ミュート永続化キー
   const STORAGE_KEY_MUTED = 'bangs_edge_muted';
+  const STORAGE_KEY_VOLUME = 'bangs_edge_volume';
 
   // 内部状態
   let audioCtx = null;
   let masterGain = null;
   let noiseBuffer = null;
   let isMutedState = false;
+  let volumeLevel = 1.0;
 
   // 警告パルス管理
   let pulseTimer = 0;
@@ -49,6 +51,27 @@
     isMutedState = false;
   }
 
+  // 音量状態の復元
+  try {
+    const savedVol = localStorage.getItem(STORAGE_KEY_VOLUME);
+    if (savedVol !== null) {
+      const v = parseFloat(savedVol);
+      if (typeof v === 'number' && isFinite(v)) {
+        volumeLevel = Math.max(0, Math.min(1, v));
+      }
+    }
+  } catch (e) {
+    volumeLevel = 1.0;
+  }
+
+  /**
+   * 現在のマスター音量レベルを計算
+   * @returns {number} ミュート時は0、それ以外は volumeLevel^2 (聴感2乗カーブ)
+   */
+  function masterLevel() {
+    return isMutedState ? 0 : volumeLevel * volumeLevel;
+  }
+
   /**
    * AudioContextの遅延生成 & 状態確認 (自動再生ポリシー対応)
    */
@@ -62,7 +85,7 @@
 
         // マスターゲインノード
         masterGain = audioCtx.createGain();
-        masterGain.gain.setValueAtTime(isMutedState ? 0 : 1, audioCtx.currentTime);
+        masterGain.gain.setValueAtTime(masterLevel(), audioCtx.currentTime);
         masterGain.connect(audioCtx.destination);
 
         // ホワイトノイズ用バッファの事前生成 (2.5秒分)
@@ -111,7 +134,7 @@
       try {
         const now = audioCtx.currentTime;
         masterGain.gain.cancelScheduledValues(now);
-        masterGain.gain.setValueAtTime(isMutedState ? 0 : 1, now);
+        masterGain.gain.setValueAtTime(masterLevel(), now);
       } catch (e) {}
     }
 
@@ -124,6 +147,40 @@
    */
   function isMuted() {
     return isMutedState;
+  }
+
+  /**
+   * 音量設定 (0〜1)
+   * @param {number} v
+   * @returns {number}
+   */
+  function setVolume(v) {
+    const num = parseFloat(v);
+    if (isNaN(num) || !isFinite(num)) {
+      return volumeLevel;
+    }
+    volumeLevel = Math.max(0, Math.min(1, num));
+    try {
+      localStorage.setItem(STORAGE_KEY_VOLUME, String(volumeLevel));
+    } catch (e) {}
+
+    if (audioCtx && masterGain) {
+      try {
+        const now = audioCtx.currentTime;
+        masterGain.gain.cancelScheduledValues(now);
+        masterGain.gain.setValueAtTime(masterGain.gain.value, now);
+        masterGain.gain.setTargetAtTime(masterLevel(), now, 0.015);
+      } catch (e) {}
+    }
+    return volumeLevel;
+  }
+
+  /**
+   * 現在の音量 (0〜1) を取得
+   * @returns {number}
+   */
+  function getVolume() {
+    return volumeLevel;
   }
 
   /**
@@ -703,6 +760,8 @@
     playResolve: playResolve,
     toggleMute: toggleMute,
     isMuted: isMuted,
+    setVolume: setVolume,
+    getVolume: getVolume,
     startDrone: startDrone,
     stopDrone: stopDrone,
     updateDrone: updateDrone,

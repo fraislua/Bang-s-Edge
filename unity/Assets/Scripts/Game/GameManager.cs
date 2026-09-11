@@ -23,6 +23,8 @@ namespace BangsEdge.Game
         private double _fpsEstimate = 60.0;
         private int _savedHighScore;
         private bool _isInitialized;
+        private bool _isDraggingVolume;
+        private float _lastSetVolume = -1f;
 
         /// <summary>
         /// 指数移動平均によるFPS推定値 (P5のHUD表示等で使用)。
@@ -131,33 +133,70 @@ namespace BangsEdge.Game
                                  ly >= muteRect.yMin &&
                                  ly <= muteRect.yMax;
 
-                if (!inMuteBtn)
+                Rect sliderRect = GameHud.VolumeSliderRect;
+                bool inSlider = lx >= sliderRect.xMin &&
+                                lx <= sliderRect.xMax &&
+                                ly >= sliderRect.yMin &&
+                                ly <= sliderRect.yMax;
+
+                if (inMuteBtn)
+                {
+                    AudioMuteManager.ToggleMute();
+                }
+                else if (inSlider)
+                {
+                    _isDraggingVolume = true;
+                    if (AudioMuteManager.IsMuted)
+                    {
+                        AudioMuteManager.SetMuted(false);
+                    }
+                    float v = GameHud.VolumeFromLogicalX(lx);
+                    AudioMuteManager.SetVolume(v);
+                    _lastSetVolume = v;
+                }
+                else
                 {
                     // JS版では performance.now() (実時間ミリ秒) を渡す
                     double realNowMs = Time.realtimeSinceStartupAsDouble * 1000.0;
                     _sim.StartRound(realNowMs);
                 }
-                else
+            }
+            else if (_isDraggingVolume && mouse.leftButton.isPressed)
+            {
+                float v = GameHud.VolumeFromLogicalX(lx);
+                if (Mathf.Abs(v - _lastSetVolume) >= 0.001f)
                 {
-                    AudioMuteManager.ToggleMute();
+                    AudioMuteManager.SetVolume(v);
+                    _lastSetVolume = v;
                 }
             }
 
             // 左ボタンを離した瞬間
             if (mouse.leftButton.wasReleasedThisFrame)
             {
-                _sim.ConfirmRound();
-                CheckSaveHighScore();
+                if (_isDraggingVolume)
+                {
+                    _isDraggingVolume = false;
+                }
+                else
+                {
+                    _sim.ConfirmRound();
+                    CheckSaveHighScore();
+                }
             }
         }
 
         private void OnApplicationFocus(bool hasFocus)
         {
             // フォーカス喪失時 (JSの pointercancel 相当)
-            if (!hasFocus && _sim != null)
+            if (!hasFocus)
             {
-                _sim.ConfirmRound();
-                CheckSaveHighScore();
+                _isDraggingVolume = false;
+                if (_sim != null)
+                {
+                    _sim.ConfirmRound();
+                    CheckSaveHighScore();
+                }
             }
         }
 

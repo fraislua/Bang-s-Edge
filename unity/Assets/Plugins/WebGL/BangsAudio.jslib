@@ -41,5 +41,18 @@ mergeInto(LibraryManager.library, {
       return window.AudioController.isMuted() ? 1 : 0;
     }
     return 0;
+  },
+
+  BangsAudio_SetVolume: function (volume) {
+    if (typeof window !== 'undefined' && window.AudioController && typeof window.AudioController.setVolume === 'function') {
+      window.AudioController.setVolume(volume);
+    }
+  },
+
+  BangsAudio_GetVolume: function () {
+    if (typeof window !== 'undefined' && window.AudioController && typeof window.AudioController.getVolume === 'function') {
+      return window.AudioController.getVolume();
+    }
+    return 1;
   }
 });

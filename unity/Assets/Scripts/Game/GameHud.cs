@@ -31,6 +31,16 @@ namespace BangsEdge.Game
 
         // ミュートボタンの論理座標(左上原点、y下向き)。クリック判定の GameManager と共有する
         public static readonly Rect MuteButtonRect = new Rect(FromRight(1874f), FromTop(18f), Px(28f), Px(28f));
+        public static readonly Rect VolumeSliderRect = new Rect(FromRight(1774f), FromTop(18f), Px(90f), Px(28f));
+
+        public static float VolumeFromLogicalX(double lx)
+        {
+            float trackLeft = FromRight(1780f);
+            float trackLength = Px(78f);
+            if (trackLength <= 0f) return 0f;
+            float v = (float)((lx - trackLeft) / trackLength);
+            return Mathf.Clamp01(v);
+        }
 
         // フォント。通常と太字は別のファイルを使う(Unityに太字を合成させると、小さい漢字の線が潰れて読めなくなった)
         private Font _fontRegular;
@@ -42,6 +52,7 @@ namespace BangsEdge.Game
         private Sprite _barFillSprite;
         private Sprite _muteBtnMutedSprite;
         private Sprite _muteBtnUnmutedSprite;
+        private Sprite _knobSprite;
 
         // UI コンポーネント参照
         private Canvas _canvas;
@@ -80,6 +91,11 @@ namespace BangsEdge.Game
         // ミュートボタン
         private Image _muteBtnImage;
 
+        // 音量スライダー
+        private Image _sliderBgImage;
+        private Image _sliderFillImage;
+        private Image _sliderKnobImage;
+
         // キャッシュ変数 (GC Alloc / 不要更新防止)
         private DangerStage _cachedDangerStage = (DangerStage)(-1);
         private int _cachedGraceCounter = -1;
@@ -101,6 +117,10 @@ namespace BangsEdge.Game
 
         private bool _cachedMuted;
         private bool _isMuteBtnInitialized;
+
+        private float _cachedVolume = -1f;
+        private bool _cachedSliderMuted;
+        private bool _isVolumeSliderInitialized;
 
         public void Initialize(Camera boardCamera)
         {
@@ -157,6 +177,37 @@ namespace BangsEdge.Game
             // 4. ミュートボタン用スプライト (112x112テクセル, JS版の28x28論理px, 角丸6px, スピーカー/×/音波)
             _muteBtnMutedSprite = CreateMuteButtonSprite(true);
             _muteBtnUnmutedSprite = CreateMuteButtonSprite(false);
+
+            // 5. 音量スライダースプライト (64x64, 白, アンチエイリアス円)
+            _knobSprite = CreateKnobSprite();
+        }
+
+        private Sprite CreateKnobSprite()
+        {
+            int size = 64;
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            tex.filterMode = FilterMode.Bilinear;
+            var colors = new Color32[size * size];
+
+            float center = 31.5f;
+            float radius = 31f;
+
+            for (int y = 0; y < size; y++)
+            {
+                float dy = y - center;
+                for (int x = 0; x < size; x++)
+                {
+                    float dx = x - center;
+                    float d = Mathf.Sqrt(dx * dx + dy * dy);
+                    float alpha = Mathf.Clamp01(0.5f + radius - d);
+                    byte a = (byte)Mathf.RoundToInt(alpha * 255f);
+                    colors[y * size + x] = new Color32(255, 255, 255, a);
+                }
+            }
+
+            tex.SetPixels32(colors);
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 1f);
         }
 
         private Sprite CreateBarBackgroundSprite()
@@ -542,7 +593,7 @@ namespace BangsEdge.Game
                 FromTop(36f)
             );
 
-            // 7. ハイスコア (右上 x=1860, y=36, 太字16, #ffd700, 右揃え)
+            // 7. ハイスコア (右上 x=1760, y=36, 太字16, #ffd700, 右揃え)
             _highScoreText = CreateText(
                 hudRoot.transform,
                 "HighScore",
@@ -551,7 +602,7 @@ namespace BangsEdge.Game
                 FontStyle.Bold,
                 new Color(1f, 215f / 255f, 0f, 1f),
                 TextAnchor.LowerRight,
-                FromRight(1860f),
+                FromRight(1760f),
                 FromTop(36f)
             );
 
@@ -566,6 +617,54 @@ namespace BangsEdge.Game
             _muteBtnImage = muteGo.AddComponent<Image>();
             _muteBtnImage.sprite = _muteBtnUnmutedSprite;
             _muteBtnImage.raycastTarget = false;
+
+            // 10. 音量スライダー (トラック左端 1780, 長さ78, 中心y 32, 太さ4)
+            var sliderRoot = new GameObject("VolumeSlider");
+            sliderRoot.transform.SetParent(hudRoot.transform, false);
+            var sliderRootRt = sliderRoot.AddComponent<RectTransform>();
+            SetFillParent(sliderRootRt);
+
+            // トラック全体の背景
+            var sliderBgGo = new GameObject("SliderBg");
+            sliderBgGo.transform.SetParent(sliderRoot.transform, false);
+            var sliderBgRt = sliderBgGo.AddComponent<RectTransform>();
+            sliderBgRt.anchorMin = new Vector2(0f, 1f);
+            sliderBgRt.anchorMax = new Vector2(0f, 1f);
+            sliderBgRt.pivot = new Vector2(0f, 0.5f);
+            sliderBgRt.anchoredPosition = new Vector2(FromRight(1780f), -FromTop(32f));
+            sliderBgRt.sizeDelta = new Vector2(Px(78f), Px(4f));
+            _sliderBgImage = sliderBgGo.AddComponent<Image>();
+            _sliderBgImage.sprite = _solidWhiteSprite;
+            _sliderBgImage.color = new Color(148f / 255f, 163f / 255f, 184f / 255f, 0.35f);
+            _sliderBgImage.raycastTarget = false;
+
+            // 音量分の塗り
+            var sliderFillGo = new GameObject("SliderFill");
+            sliderFillGo.transform.SetParent(sliderRoot.transform, false);
+            var sliderFillRt = sliderFillGo.AddComponent<RectTransform>();
+            sliderFillRt.anchorMin = new Vector2(0f, 1f);
+            sliderFillRt.anchorMax = new Vector2(0f, 1f);
+            sliderFillRt.pivot = new Vector2(0f, 0.5f);
+            sliderFillRt.anchoredPosition = new Vector2(FromRight(1780f), -FromTop(32f));
+            sliderFillRt.sizeDelta = new Vector2(Px(78f), Px(4f));
+            _sliderFillImage = sliderFillGo.AddComponent<Image>();
+            _sliderFillImage.sprite = _solidWhiteSprite;
+            _sliderFillImage.color = new Color(0f, 229f / 255f, 1f, 1f);
+            _sliderFillImage.raycastTarget = false;
+
+            // つまみ (直径 12px の円、一番上に描画するため最後に追加)
+            var knobGo = new GameObject("SliderKnob");
+            knobGo.transform.SetParent(sliderRoot.transform, false);
+            var knobRt = knobGo.AddComponent<RectTransform>();
+            knobRt.anchorMin = new Vector2(0f, 1f);
+            knobRt.anchorMax = new Vector2(0f, 1f);
+            knobRt.pivot = new Vector2(0.5f, 0.5f);
+            knobRt.anchoredPosition = new Vector2(FromRight(1780f) + Px(78f), -FromTop(32f));
+            knobRt.sizeDelta = new Vector2(Px(12f), Px(12f));
+            _sliderKnobImage = knobGo.AddComponent<Image>();
+            _sliderKnobImage.sprite = _knobSprite;
+            _sliderKnobImage.color = new Color(0f, 229f / 255f, 1f, 1f);
+            _sliderKnobImage.raycastTarget = false;
         }
 
         private void BuildCenterTexts(Transform parent)
@@ -707,6 +806,9 @@ namespace BangsEdge.Game
 
             // 7. ミュートボタンの更新
             UpdateMuteButton();
+
+            // 8. 音量スライダーの更新
+            UpdateVolumeSlider();
         }
 
         private void UpdateDensityBar(BangSimulation sim, double nowMs)
@@ -933,6 +1035,36 @@ namespace BangsEdge.Game
             }
         }
 
+        private void UpdateVolumeSlider()
+        {
+            float volume = AudioMuteManager.Volume;
+            bool isMuted = AudioMuteManager.IsMuted;
+
+            if (!_isVolumeSliderInitialized || Mathf.Abs(volume - _cachedVolume) > 0.0001f || isMuted != _cachedSliderMuted)
+            {
+                _isVolumeSliderInitialized = true;
+                _cachedVolume = volume;
+                _cachedSliderMuted = isMuted;
+
+                float trackLeft = FromRight(1780f);
+                float trackLength = Px(78f);
+                float trackCenterY = FromTop(32f);
+
+                _sliderFillImage.rectTransform.sizeDelta = new Vector2(trackLength * volume, Px(4f));
+                _sliderKnobImage.rectTransform.anchoredPosition = new Vector2(trackLeft + trackLength * volume, -trackCenterY);
+
+                Color fillColor = isMuted
+                    ? new Color(148f / 255f, 163f / 255f, 184f / 255f, 0.6f)
+                    : new Color(0f, 229f / 255f, 1f, 1f);
+                Color knobColor = isMuted
+                    ? new Color(148f / 255f, 163f / 255f, 184f / 255f, 1f)
+                    : new Color(0f, 229f / 255f, 1f, 1f);
+
+                _sliderFillImage.color = fillColor;
+                _sliderKnobImage.color = knobColor;
+            }
+        }
+
         private void OnDestroy()
         {
             // 動的生成したテクスチャとスプライトの明示的破棄
@@ -941,6 +1073,7 @@ namespace BangsEdge.Game
             DestroySpriteAndTexture(_barFillSprite);
             DestroySpriteAndTexture(_muteBtnMutedSprite);
             DestroySpriteAndTexture(_muteBtnUnmutedSprite);
+            DestroySpriteAndTexture(_knobSprite);
         }
 
         private static void DestroySpriteAndTexture(Sprite sprite)

@@ -2,6 +2,7 @@
 // Wraps every AudioController method with a call counter, then plays the same scripted rounds in
 // headless Chrome: a short hold released before the bang, a long hold into the bang, and a mute
 // toggle followed by a reload. Run it on the web version and on the Unity WebGL build and compare.
+// On the Unity build it also drags the volume slider (which only the Unity build has) and reloads.
 //
 //   node tools/web-shot/cdp-audio-check.mjs <url> <outDir> <name> [bangHoldMs] [hudScale]
 //
@@ -149,6 +150,41 @@ await send('Page.reload');
 await loadAndWait();
 summary.mutedAfterReload = await evaluate('window.AudioController && window.AudioController.isMuted()');
 await shot(`${name}-mute-reloaded.png`, ...MUTE_SHOT);
+
+// 4. Volume slider (Unity build only): press at 25% of the track, drag to 50% and release.
+// The drag must set and store the volume, unmute, and not start a round. Then reload and read it back.
+if (load.isUnity) {
+  await evaluate(INSTALL);
+  await takeCounts();
+  // Track in the web version's layout: x 1780..1858, centre y 32, scaled from the right and top edges.
+  const trackLeft = W - (W - 1780) * HUD_SCALE, trackLen = 78 * HUD_SCALE, trackY = 32 * HUD_SCALE;
+  const vx = (r) => trackLeft + trackLen * r;
+  const VOLUME_SHOT = [W - (W - 1620) * HUD_SCALE, 0, (W - 1620) * HUD_SCALE, 60 * HUD_SCALE, 2];
+  const getVolume = `(window.AudioController.getVolume ? window.AudioController.getVolume() : 'missing')`;
+  await shot(`${name}-volume-before.png`, ...VOLUME_SHOT);
+  await mouse('mouseMoved', vx(0.25), trackY);
+  await mouse('mousePressed', vx(0.25), trackY);
+  await sleep(500);
+  summary.volumeAfterPress = await evaluate(getVolume);
+  for (let i = 1; i <= 5; i++) {
+    await mouse('mouseMoved', vx(0.25 + 0.05 * i), trackY);
+    await sleep(150);
+  }
+  await sleep(300);
+  await mouse('mouseReleased', vx(0.5), trackY);
+  await sleep(1000);
+  summary.volumeAfterDrag = await evaluate(getVolume);
+  summary.volumeStorage = await evaluate(`localStorage.getItem('bangs_edge_volume')`);
+  summary.mutedAfterVolumeDrag = await evaluate('window.AudioController.isMuted()');
+  summary.volumeDragCalls = await takeCounts();
+  summary.volumeDragStartedRound = (summary.volumeDragCalls.startDrone || 0) > 0;
+  await shot(`${name}-volume-after.png`, ...VOLUME_SHOT);
+
+  await send('Page.reload');
+  await loadAndWait();
+  summary.volumeAfterReload = await evaluate(getVolume);
+  await shot(`${name}-volume-reloaded.png`, ...VOLUME_SHOT);
+}
 
 console.log(JSON.stringify(summary, null, 2));
 ws.close();

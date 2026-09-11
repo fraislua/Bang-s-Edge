@@ -33,6 +33,12 @@ namespace BangsEdge.Game
 
         [DllImport("__Internal")]
         private static extern int BangsAudio_IsMuted();
+
+        [DllImport("__Internal")]
+        private static extern void BangsAudio_SetVolume(double volume);
+
+        [DllImport("__Internal")]
+        private static extern double BangsAudio_GetVolume();
 #endif
 
         public void StartDrone()
@@ -95,6 +101,32 @@ namespace BangsEdge.Game
             return BangsAudio_IsMuted() != 0;
 #else
             return false;
+#endif
+        }
+
+        /// <summary>
+        /// マスター音量を設定する (0.0〜1.0)。
+        /// WebGLビルド時は BangsAudio_SetVolume を呼び出す。
+        /// 非WebGL・エディタ環境では何もしない。
+        /// </summary>
+        public static void SetVolume(float volume)
+        {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            BangsAudio_SetVolume(volume);
+#endif
+        }
+
+        /// <summary>
+        /// 現在のマスター音量を取得する (0.0〜1.0)。
+        /// WebGLビルド時は BangsAudio_GetVolume を呼び出す。
+        /// 非WebGL・エディタ環境では 1.0f を返す。
+        /// </summary>
+        public static float GetVolume()
+        {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            return (float)BangsAudio_GetVolume();
+#else
+            return 1f;
 #endif
         }
     }

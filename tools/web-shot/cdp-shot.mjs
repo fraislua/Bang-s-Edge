@@ -100,7 +100,8 @@ await shot(`${name}-score.png`, hudRegion(0, 0, 300, 60, 4, 0, 0));
 await shot(`${name}-title.png`, hudRegion(760, 480, 400, 120, 3, 960, 540));
 
 // Hold the board centre so the in-range line (the Japanese HUD text) appears.
-const cx = ox + 960 * s, cy = oy + 540 * s;
+// HOLD_X / HOLD_Y (board coordinates) hold somewhere else, e.g. near an edge where the in-range count drops.
+const cx = ox + Number(process.env.HOLD_X || 960) * s, cy = oy + Number(process.env.HOLD_Y || 540) * s;
 await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: cx, y: cy });
 await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: cx, y: cy, button: 'left', clickCount: 1 });
 await sleep(2500);

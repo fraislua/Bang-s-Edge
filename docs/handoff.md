@@ -24,7 +24,7 @@
 |---|---|
 | `unity/Assets/Scripts/Simulation/` | 物理とゲーム状態。**UnityEngineに依存しない純粋なC#**(asmdefで`noEngineReferences`)、倍精度。`BangSimulation`・`GameConfig`・`Mulberry32` |
 | `unity/Assets/Scripts/Game/` | コードから実行時に組み立てる(シーンは編集しない)。`GameBootstrap`(起動)・`GameManager`(自前アキュムレータのループ・入力・ハイスコア)・`LetterboxCamera`・`GameRenderer`・`GameHud`・`AudioMuteManager`・`WebAudioEvents` |
-| `unity/Assets/Plugins/WebGL/` | `audio.jspre`(**JS版`audio.js`のバイト単位のコピー**)・`audio-unlock.jspre`(押下イベント内で`init()`)・`BangsAudio.jslib`(C#→`AudioController`の中継) |
+| `unity/Assets/Plugins/WebGL/` | `audio.jspre`(**JS版`audio.js`のコピーに音量調節だけを足したもの**。差分は`docs/unity-port-plan.md` §5-5)・`audio-unlock.jspre`(押下イベント内で`init()`)・`BangsAudio.jslib`(C#→`AudioController`の中継) |
 | `unity/Assets/Resources/Fonts/` | BIZ UDゴシック 通常・太字(OFL、ライセンス文同梱) |
 | `unity/Assets/WebGLTemplates/FullWindow/` | キャンバスをウィンドウ全体に広げるテンプレート |
 | `unity/Assets/Editor/WebGLBuild.cs` | バッチビルド用 |
@@ -105,7 +105,7 @@ node tools/web-shot/cdp-audio-check.mjs <url> <outDir> <name> [bangHoldMs]
 
 ## 5. 未解決・保留事項
 
-1. **UIの微調整**(ユーザーが「音が入ってから」と保留): 文字の大きさ、「BIG BANG DETECTED!」の赤い光(縁取りは外したまま)と絵文字💥(フォントに無い)、タイトルと説明文もBIZ UDゴシック(等幅)になりJS版のsans-serifより横に広い。小さいウィンドウでまだ読みにくければTextMeshPro(SDF)を検討。
+1. ~~**UIの微調整**~~ **完了(2026-09-11)**: HUD全体を`GameHud.HudScale`(2倍)で拡大(ユーザー方針「少し大きすぎるくらい」)。赤い光・💥・タイトルの字間は「行わなくて問題ない」(ユーザー判断)。**音量スライダーをUnity版にだけ追加**(ミュートボタンの左、`docs/unity-port-plan.md` §5-5)。「射程内 200 / 200 が変わらない」報告は仕様どおり(中央付近では満数、`docs/dev-notes.md`)で、表示の意味が伝わりにくい点は残る。
 2. **JS版の凍結を解くか、今後どちらを主にするか**、pushとGitHub Pagesの扱い。
 3. **ビッグバンの時刻が揺動の位相に張り付いている**: 中央で微細振動する操作では、200シード中86%が10.0〜10.2秒に発火(揺動Y成分の最小付近)。「ストップウォッチで解ける」問題が形を変えて残っている可能性。測った操作は1種類で機序は未検証。旧項目「揺動(`WOBBLE_*`)の整理」と合わせて扱う。
 4. **小さいウィンドウで文字と粒子が読めない**(論理盤面固定の副作用)。最小サイズの下限は未決定。
