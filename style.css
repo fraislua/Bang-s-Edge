@@ -18,3 +18,22 @@ html, body {
   width: 100%;
   height: 100%;
 }
+
+/* Bottom-right, away from the fps readout (bottom-left). Only the link takes clicks, so pressing the
+   text still reaches the game underneath. */
+#legacy-note {
+  position: fixed;
+  right: 12px;
+  bottom: 10px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.6);
+  color: rgba(203, 213, 225, 0.85);
+  font: 13px/1.4 system-ui, sans-serif;
+  pointer-events: none;
+}
+
+#legacy-note a {
+  color: #00e5ff;
+  pointer-events: auto;
+}

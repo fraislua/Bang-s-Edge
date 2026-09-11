@@ -1,6 +1,11 @@
 # Bang's-Edge
 
-長押しで粒子を集め、ビッグバンが起きる寸前で離してスコアを競うミニゲーム。PCはマウス、スマホはタッチで遊べる。Unity(WebGL)版をunityroomで公開中(スコアとビッグバン最短時間のランキング付き)。
+長押しで粒子を集め、ビッグバンが起きる寸前で離してスコアを競うミニゲーム。PCはマウス、スマホはタッチで遊べる。
+
+## 遊ぶ
+
+- **最新版(Unity版)**: https://unityroom.com/games/bang-s-edge — スコアとビッグバン最短時間のランキング付き、スマホ対応
+- **旧バージョン(JS版)**: https://fraislua.github.io/Bang-s-Edge/ — 開発途中の調整段階のもの。PCのマウスのみで、ランキングは無く、遊びの調整も今の版とは違う
 
 ## このリポジトリについて
 
@@ -10,8 +15,8 @@
 
 | 場所 | 中身 |
 |---|---|
-| `unity/` | Unity 6000.3・URP・C#のWebGL版。unityroomで公開している版 |
-| リポジトリ直下(`index.html`・`script.js`・`config.js`・`audio.js`・`style.css`) | 最初に作ったJS版(Canvas、ビルド無し)。物理の基準。Unity版とは設定値が一部違う |
+| `unity/` | Unity 6000.3・URP・C#のWebGL版。unityroomで公開している最新版 |
+| リポジトリ直下(`index.html`・`script.js`・`config.js`・`audio.js`・`style.css`) | 最初に作ったJS版(Canvas、ビルド無し)。**調整段階の旧バージョン**としてGitHub Pagesに置いている。物理のロジックはUnity版と同じで、Unity版の基準にも使っているが、設定値が一部違う(引き寄せる点が揺れる、など) |
 | `tools/` | JS版を固定シードで回してUnity版の基準データを作るハーネス、ヘッドレスChromeで撮影・音・タッチ操作を確かめるスクリプト |
 | `docs/` | 仕様・計画・開発の記録 |
 
@@ -31,6 +36,6 @@
 - **JS版**: リポジトリ直下を`python -m http.server 8000`などで配信し、`index.html`を開く(`file://`では開かない)。
 - **Unity版**: Unity 6000.3.11f1で`unity/`を開く。unityroomのランキングへ送るには`unity/Assets/Resources/Secrets/unityroom-hmac.txt`にHMACキーが必要(gitの対象外)。無ければ送信しないだけで、遊ぶことはできる。
 
-## クレジット
+## ライセンス
 
-- フォント: BIZ UDゴシック(SIL Open Font License 1.1。ライセンス文は`unity/Assets/Resources/Fonts/`に同梱)
+[MIT License](LICENSE)。ただし同梱のフォント(BIZ UDゴシック、`unity/Assets/Resources/Fonts/`)は、同じフォルダにあるSIL Open Font License 1.1に従う。

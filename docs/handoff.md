@@ -129,7 +129,7 @@ node tools/web-shot/cdp-audio-check.mjs <url> <outDir> <name> [bangHoldMs] [hudS
 2. **揺動ありを別の遊び方として出すか**: ユーザーは「以前のランダム性にも別の面白さがあった」と言っている(JS版は揺動ありのまま)。
 3. **ゲームバランス**(`R_MAX_RATIO`・`F_CREEP`・`TAU_R`)は煮詰め途中。易しくする方向は確認してから。
 4. **仕様書の更新**: `docs/game-concept.md`の「音」の節が古い。Unity版だけの要素(HUD倍率・音量・星・ランキング)は仕様書に無く、`docs/unity-port-plan.md` §5にある。未確定事項2つ(「一度離したら即終了」で良いか、ビッグバン演出の作り込み)も残る。
-5. **GitHubの扱い**: 公開に戻すことは決定(切り替えはユーザー)。残っているのは、PagesでJS版を再公開するか / Unity版の到達点にタグを打つか(既存は`v1`・`v1.1`) / ライセンスを付けるか / コミットの作者欄のメールアドレスをそのままにするか(`docs/dev-notes.md`。Brainは書き換えないことを推奨)。READMEにunityroomのURLを入れる(URLをユーザーに確認する)。
+5. **GitHubの扱い**(2026-09-11にユーザーが決定): 公開に戻す(切り替えはユーザー) / ライセンスはMIT(同梱フォントはOFLのまま) / **JS版はGitHub Pagesで再公開する**。画面の右下に「開発途中(調整段階)の旧バージョン」とunityroomへのリンクを出し、Jekyllの変換を止める`.nojekyll`を置いた。**Pagesの有効化は、リポジトリが公開になってからBrainが行う**(無料プランは非公開のリポジトリでPagesを使えない)。unityroomのURLは https://unityroom.com/games/bang-s-edge 。残っているのは、Unity版の到達点にタグを打つか(既存は`v1`・`v1.1`) / コミットの作者欄のメールアドレスをそのままにするか(`docs/dev-notes.md`。Brainは書き換えないことを推奨)。
 6. **165Hz表示では動きが60Hzに量子化される**(固定ステップの副作用)。指摘は無し。
 7. **ビルドの縮小案**(フォントを使う文字だけにする8.9MB減など)はユーザー判断で見送り。容量で困ったら再検討。
 8. **細かい残り**: Unity Cloudの紐付け(`cloudProjectId`)を外すか / 不要パッケージ(Visual Scripting等)の整理 / vivoxスキルを残すか / MCPの未検証2点(推論トークンだけで出力上限を使い切る経路、326秒超の`compare`)。
