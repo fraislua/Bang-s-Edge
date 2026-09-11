@@ -4,8 +4,10 @@
 //
 //   node tools/sim-harness/golden.js
 //
-// The JS version is the reference during the port (docs/unity-port-plan.md), so this reads the
-// shipped files as they are and never patches them.
+// script.js is the reference for the simulation logic (docs/unity-port-plan.md) and is never
+// patched. The Unity build deliberately uses a few different config values (§5-6), so those are
+// read from GameConfig.cs and applied to config.js in memory; the files on disk stay unchanged,
+// and any difference outside INTENTIONAL_DIFFERENCES stops the run.
 //
 // Doubles are written as their IEEE-754 bit patterns (16 hex digits), not as decimal numbers:
 // Unity's JsonUtility does not parse decimal doubles exactly (it came back one ulp off), which
@@ -36,6 +38,38 @@ function mulberry32(seed) {
   const next = mulberry32Raw(seed);
   return () => next() / 4294967296;
 }
+
+// Config values where the Unity build intentionally differs from the web version.
+const INTENTIONAL_DIFFERENCES = ['WOBBLE_AX', 'WOBBLE_AY', 'TAU_R'];
+
+// Compares every numeric key of config.js with the same constant in GameConfig.cs and returns the
+// Unity values that differ. Differences outside INTENTIONAL_DIFFERENCES are treated as mistakes.
+function unityConfigOverrides() {
+  const cs = fs.readFileSync(path.join(ROOT, 'unity', 'Assets', 'Scripts', 'Simulation', 'GameConfig.cs'), 'utf8');
+  const csValues = {};
+  for (const m of cs.matchAll(/public const (?:int|double) (\w+) = (-?[0-9.]+);/g)) csValues[m[1]] = Number(m[2]);
+  const js = fs.readFileSync(path.join(ROOT, 'config.js'), 'utf8');
+  const overrides = {};
+  let compared = 0;
+  for (const m of js.matchAll(/^\s+(\w+):\s*(-?[0-9.]+),/gm)) {
+    const key = m[1];
+    assert.ok(key in csValues, `GameConfig.cs has no constant ${key}`);
+    compared++;
+    if (csValues[key] !== Number(m[2])) overrides[key] = csValues[key];
+  }
+  // config.js has 29 numeric keys (2026-09-11); fewer means the pattern stopped matching some of them.
+  assert.ok(compared >= 29, `only ${compared} config keys were compared; the pattern probably stopped matching`);
+  assert.deepStrictEqual(Object.keys(overrides).sort(), [...INTENTIONAL_DIFFERENCES].sort(),
+    `config.js and GameConfig.cs differ in unexpected keys: ${JSON.stringify(overrides)}`);
+  return overrides;
+}
+
+const CONFIG_OVERRIDES = unityConfigOverrides();
+const CONFIG_SRC = Object.entries(CONFIG_OVERRIDES).reduce((src, [key, value]) => {
+  const re = new RegExp(`^(\\s+${key}:\\s*)-?[0-9.]+,`, 'm');
+  assert.ok(re.test(src), `config key ${key} not found for override`);
+  return src.replace(re, `$1${value},`);
+}, fs.readFileSync(path.join(ROOT, 'config.js'), 'utf8'));
 
 const view = new DataView(new ArrayBuffer(8));
 const MASK64 = 0xFFFFFFFFFFFFFFFFn;
@@ -92,10 +126,12 @@ function loadGame(seed) {
   vm.runInContext('Math.random = __rng;', sandbox);
   assert.strictEqual(vm.runInContext('Math.random === __rng', sandbox), true, 'Math.random override did not take');
 
-  for (const file of ['config.js', 'script.js']) {
-    vm.runInContext(fs.readFileSync(path.join(ROOT, file), 'utf8'), sandbox, { filename: file });
-  }
+  vm.runInContext(CONFIG_SRC, sandbox, { filename: 'config.js' });
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'script.js'), 'utf8'), sandbox, { filename: 'script.js' });
   const run = (code) => vm.runInContext(code, sandbox);
+  for (const [key, value] of Object.entries(CONFIG_OVERRIDES)) {
+    assert.strictEqual(run(`CONFIG.${key}`), value, `override ${key} did not take`);
+  }
   assert.strictEqual(typeof run('update'), 'function', 'script.js did not load');
   return run;
 }

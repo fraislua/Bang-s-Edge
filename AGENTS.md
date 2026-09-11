@@ -10,7 +10,7 @@
 
 - ジャンル: マウスのみで遊ぶゲーム。
 - **2026-09-11からUnityへ移植中。** 移植先は`unity/`(Unity 6000.3.11f1、URP(Universal 2D)、C#、ターゲットはWebGL)。
-- **JS版**(リポジトリ直下の`index.html`/`style.css`/`config.js`/`script.js`/`audio.js`、素のHTML/CSS/JS・Canvas API)は移植前の現行版(リポジトリは非公開で、GitHub Pagesは停止中)で、**移植の挙動の基準**。依頼が無い限り変更しない。
+- **JS版**(リポジトリ直下の`index.html`/`style.css`/`config.js`/`script.js`/`audio.js`、素のHTML/CSS/JS・Canvas API)は移植前の現行版(リポジトリは非公開で、GitHub Pagesは停止中)で、**物理のロジックの基準**。依頼が無い限り変更しない。Unity版は設定値3つ(`WOBBLE_AX`/`WOBBLE_AY`=0、`TAU_R`=8)を意図的にJS版と変えてある(`docs/unity-port-plan.md` §5-6)。
 - 仕様の正本: `docs/game-concept.md`(特に「実装仕様」の数式・パラメータ)。移植方針: `docs/unity-port-plan.md`。
 
 ## 文書体系

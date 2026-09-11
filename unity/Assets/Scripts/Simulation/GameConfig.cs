@@ -20,7 +20,7 @@ namespace BangsEdge.Simulation
         public const int R_MEASURE = 40;             // 密度測定円の半径(固定) (px)
         public const int R_MIN = 30;                 // 集積半径の最小値 (px)
         public const double R_MAX_RATIO = 0.65;      // 集積半径の最大比率 (画面対角線に対する比率)
-        public const double TAU_R = 3.0;             // 集積半径の時定数 (s)
+        public const double TAU_R = 8.0;             // 集積半径の時定数 (s)。JS版は3.0。揺動を止めても発火が約10秒になるよう遅くした(docs/unity-port-plan.md §5-6)
 
         // 引力
         public const int F_MIN = 50;                 // 引力の最小値 (px/s²)
@@ -37,8 +37,10 @@ namespace BangsEdge.Simulation
         public const double REPULSION_EPS = 0.05;    // 反発の方向が定義できない最小距離 (px)
         public const int ACCEL_CLIP = 8000;          // 1粒子あたりの合成加速度の上限 (px/s^2)
         public const int VELOCITY_CLIP = 720;        // 速度の上限 (px/s)
-        public const int WOBBLE_AX = 12;             // 引力中心の揺動振幅 X (px)
-        public const int WOBBLE_AY = 9;              // 引力中心の揺動振幅 Y (px)
+        // 引力中心の揺動振幅 (px)。JS版は12/9。揺動で測定円内の個数が大きく上下し、発火が決まった時刻に揃って
+        // 「一定秒数で離す」ほうが危険度表示を読むより強くなったので止めた(docs/dev-notes.md 2026-09-11)
+        public const int WOBBLE_AX = 0;
+        public const int WOBBLE_AY = 0;
         public const double WOBBLE_F1 = 0.73;        // 揺動周波数 X (Hz)
         public const double WOBBLE_F2 = 0.97;        // 揺動周波数 Y (Hz)
 
