@@ -125,20 +125,6 @@ namespace BangsEdge.Game
             var pointer = Pointer.current;
             if (pointer == null) return;
 
-            // 縦向き時はプレイ不可のため、引き寄せ中なら終了処理を行って早期リターン
-            bool portraitScreen = Screen.height > Screen.width;
-            if (portraitScreen)
-            {
-                _isDraggingVolume = false;
-                if (_sim != null && _sim.State == GameState.Attracting)
-                {
-                    _sim.ConfirmRound();
-                    CheckSaveHighScore();
-                    HandleRoundTransitions();
-                }
-                return;
-            }
-
             bool touchInput = pointer is Touchscreen;
 
             Vector2 screenPos = pointer.position.ReadValue();

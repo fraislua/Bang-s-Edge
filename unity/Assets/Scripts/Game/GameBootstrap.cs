@@ -51,17 +51,11 @@ namespace BangsEdge.Game
             renderer.Initialize();
             manager.Initialize(renderer, letterbox, hud);
 
-            // 5. 画面向き案内 (縦向き時に横向き案内を表示)
-            var noticeGo = new GameObject("OrientationNotice");
-            var notice = noticeGo.AddComponent<OrientationNotice>();
-            notice.Initialize();
-
             // シーン再読込時にも保持
             Object.DontDestroyOnLoad(boardCamera.gameObject);
             Object.DontDestroyOnLoad(blackBarsGo);
             Object.DontDestroyOnLoad(managerGo);
             Object.DontDestroyOnLoad(hudGo);
-            Object.DontDestroyOnLoad(noticeGo);
         }
     }
 }

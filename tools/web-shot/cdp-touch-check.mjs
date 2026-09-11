@@ -11,7 +11,8 @@
 //   <name>-3-released.png  after lifting: the round result and TAP wording
 //   <name>-4-mute.png      after a tap just below the mute button: the icon should show muted
 //   <name>-5-cancel.png    a hold ended by touchCancel: should resolve like a release
-//   <name>-6-portrait.png  the same phone upright: the rotate notice should cover the screen
+//   <name>-6-portrait.png  the same phone upright: the board stays playable, letterboxed (no rotate notice;
+//                          unityroom keeps the canvas wide even on an upright phone, so none is shown)
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
