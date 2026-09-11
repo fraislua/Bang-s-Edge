@@ -124,12 +124,12 @@ namespace BangsEdge.Game
             // 左ボタンを押した瞬間
             if (mouse.leftButton.wasPressedThisFrame)
             {
-                // ミュートボタンの矩形判定 (右上: size 28, marginRight 18, marginTop 18)
-                // rect.x = 1920 - 18 - 28 = 1874, rect.y = 18
-                bool inMuteBtn = lx >= (GameConfig.LOGICAL_WIDTH - 18 - 28) &&
-                                 lx <= (GameConfig.LOGICAL_WIDTH - 18) &&
-                                 ly >= 18 &&
-                                 ly <= (18 + 28);
+                // ミュートボタンの矩形判定。大きさはHUDの拡大率に合わせて変わるので、描画側と同じ矩形を使う
+                Rect muteRect = GameHud.MuteButtonRect;
+                bool inMuteBtn = lx >= muteRect.xMin &&
+                                 lx <= muteRect.xMax &&
+                                 ly >= muteRect.yMin &&
+                                 ly <= muteRect.yMax;
 
                 if (!inMuteBtn)
                 {

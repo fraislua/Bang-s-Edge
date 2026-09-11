@@ -3,10 +3,12 @@
 // (--screenshot with --virtual-time-budget does not wait for a Unity build to download and start;
 // it captured a black canvas.)
 //
-//   node tools/web-shot/cdp-shot.mjs <url> <width> <height> <outDir> <name> [holdMs]
+//   node tools/web-shot/cdp-shot.mjs <url> <width> <height> <outDir> <name> [holdMs] [hudScale]
 //
 // With holdMs above 2500 the board centre stays held that long and <name>-held-center.png is
 // taken at the end (for example 25000 to reach the big bang screen under SwiftShader).
+// hudScale is GameHud.HudScale for the Unity build (1 for the web version); the HUD crops grow
+// around the same edge or centre the HUD scales from, so they still frame the same text.
 //
 // Writes <name>-full.png plus magnified crops of the HUD (score, title, and the density bar while
 // the board centre is held down, which shows the in-range line). Crops are given in 1920x1080
@@ -88,24 +90,31 @@ const shot = async (file, clip) => {
   console.log(`wrote ${file}`);
 };
 const region = (x, y, w, h, zoom) => ({ x: ox + x * s, y: oy + y * s, width: w * s, height: h * s, scale: zoom });
+// A crop in the web version's HUD layout, grown by hudScale around the anchor (ax, ay).
+const hs = Number(process.argv[8] || 1);
+const hudRegion = (x, y, w, h, zoom, ax, ay) =>
+  region(ax + (x - ax) * hs, ay + (y - ay) * hs, w * hs, h * hs, Math.max(1, zoom / hs));
 
 await shot(`${name}-full.png`);
-await shot(`${name}-score.png`, region(0, 0, 300, 60, 4));
-await shot(`${name}-title.png`, region(760, 480, 400, 120, 3));
+await shot(`${name}-score.png`, hudRegion(0, 0, 300, 60, 4, 0, 0));
+await shot(`${name}-title.png`, hudRegion(760, 480, 400, 120, 3, 960, 540));
 
 // Hold the board centre so the in-range line (the Japanese HUD text) appears.
 const cx = ox + 960 * s, cy = oy + 540 * s;
 await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: cx, y: cy });
 await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: cx, y: cy, button: 'left', clickCount: 1 });
 await sleep(2500);
-await shot(`${name}-holding-bar.png`, region(700, 0, 520, 100, 4));
+await shot(`${name}-holding-bar.png`, hudRegion(700, 0, 520, 100, 4, 960, 0));
 // Optional longer hold (6th argument, ms) to reach the big bang, then capture the centre text.
 const holdMs = Number(process.argv[7] || 2500);
 if (holdMs > 2500) {
   await sleep(holdMs - 2500);
-  await shot(`${name}-held-center.png`, region(560, 440, 800, 220, 2));
+  await shot(`${name}-held-center.png`, hudRegion(560, 440, 800, 220, 2, 960, 540));
 }
 await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: cx, y: cy, button: 'left', clickCount: 1 });
+// After the release: the round result screen (or the big bang screen if the hold reached it).
+await sleep(1000);
+await shot(`${name}-released.png`, hudRegion(560, 440, 800, 220, 2, 960, 540));
 
 ws.close();
 chrome.kill();

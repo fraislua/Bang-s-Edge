@@ -3,20 +3,27 @@
 // headless Chrome: a short hold released before the bang, a long hold into the bang, and a mute
 // toggle followed by a reload. Run it on the web version and on the Unity WebGL build and compare.
 //
-//   node tools/web-shot/cdp-audio-check.mjs <url> <outDir> <name> [bangHoldMs]
+//   node tools/web-shot/cdp-audio-check.mjs <url> <outDir> <name> [bangHoldMs] [hudScale]
 //
+// hudScale is GameHud.HudScale for the Unity build (the mute button grows with it); 1 for the web version.
 // Prints a JSON summary and writes <name>-mute-before.png / -mute-after.png / -mute-reloaded.png.
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-const [url, outDir, name, bangHold] = process.argv.slice(2);
+const [url, outDir, name, bangHold, hudScaleArg] = process.argv.slice(2);
 if (!name) {
-  console.log('usage: node cdp-audio-check.mjs <url> <outDir> <name> [bangHoldMs]');
+  console.log('usage: node cdp-audio-check.mjs <url> <outDir> <name> [bangHoldMs] [hudScale]');
   process.exit(2);
 }
 const W = 1920, H = 1080; // board scale 1: board coordinates are window pixels
 const BANG_HOLD_MS = Number(bangHold || 30000);
+const HUD_SCALE = Number(hudScaleArg || 1);
+// The web version's mute button is 28x28 at (1874, 18); the Unity HUD scales its distance from the right and top edges.
+const MUTE_SIZE = 28 * HUD_SCALE;
+const MUTE_X = W - (W - 1874) * HUD_SCALE;
+const MUTE_Y = 18 * HUD_SCALE;
+const MUTE_SHOT = [MUTE_X - 10, MUTE_Y - 10, MUTE_SIZE + 20, MUTE_SIZE + 20, Math.max(2, Math.round(6 / HUD_SCALE))];
 const CHROME = process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const PORT = 9300 + Math.floor(Math.random() * 500);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -124,9 +131,9 @@ await mouse('mouseReleased', cx, cy);
 await sleep(1500);
 summary.bangHold = await takeCounts();
 
-// 3. Mute toggle on the button (28x28 at 1874,18), then reload and read the state back.
-const mx = 1874 + 14, my = 18 + 14;
-await shot(`${name}-mute-before.png`, 1864, 8, 48, 48, 6);
+// 3. Mute toggle on the button, then reload and read the state back.
+const mx = MUTE_X + MUTE_SIZE / 2, my = MUTE_Y + MUTE_SIZE / 2;
+await shot(`${name}-mute-before.png`, ...MUTE_SHOT);
 summary.mutedBefore = await evaluate('window.AudioController.isMuted()');
 await mouse('mouseMoved', mx, my);
 await mouse('mousePressed', mx, my);
@@ -136,12 +143,12 @@ summary.mutedAfterClick = await evaluate('window.AudioController.isMuted()');
 summary.storageAfterClick = await evaluate(`localStorage.getItem('bangs_edge_muted')`);
 summary.muteClickCalls = await takeCounts();
 summary.muteClickStartedRound = (summary.muteClickCalls.startDrone || 0) > 0;
-await shot(`${name}-mute-after.png`, 1864, 8, 48, 48, 6);
+await shot(`${name}-mute-after.png`, ...MUTE_SHOT);
 
 await send('Page.reload');
 await loadAndWait();
 summary.mutedAfterReload = await evaluate('window.AudioController && window.AudioController.isMuted()');
-await shot(`${name}-mute-reloaded.png`, 1864, 8, 48, 48, 6);
+await shot(`${name}-mute-reloaded.png`, ...MUTE_SHOT);
 
 console.log(JSON.stringify(summary, null, 2));
 ws.close();

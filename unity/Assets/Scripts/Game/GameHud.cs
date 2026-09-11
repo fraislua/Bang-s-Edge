@@ -12,6 +12,26 @@ namespace BangsEdge.Game
     /// </summary>
     public sealed class GameHud : MonoBehaviour
     {
+        // UIの拡大率。座標と大きさはJS版の値(1920x1080の論理盤面)で書き、この倍率で広げる。
+        // ユーザーの方針は「少し大きすぎるくらいで見えるのが良い」(2026-09-11)。1にするとJS版と同じ大きさに戻る。
+        // 位置は最寄りの画面端か中央からの距離を広げるので、部品同士の並び方はJS版と変わらない
+        public const float HudScale = 2f;
+
+        private static readonly float LogicalW = GameConfig.LOGICAL_WIDTH;
+        private static readonly float LogicalH = GameConfig.LOGICAL_HEIGHT;
+
+        private static float FromLeft(float x) => x * HudScale;
+        private static float FromRight(float x) => LogicalW - (LogicalW - x) * HudScale;
+        private static float FromCenterX(float x) => LogicalW * 0.5f + (x - LogicalW * 0.5f) * HudScale;
+        private static float FromTop(float y) => y * HudScale;
+        private static float FromBottom(float y) => LogicalH - (LogicalH - y) * HudScale;
+        private static float FromCenterY(float y) => LogicalH * 0.5f + (y - LogicalH * 0.5f) * HudScale;
+        private static int Px(int size) => Mathf.RoundToInt(size * HudScale);
+        private static float Px(float size) => size * HudScale;
+
+        // ミュートボタンの論理座標(左上原点、y下向き)。クリック判定の GameManager と共有する
+        public static readonly Rect MuteButtonRect = new Rect(FromRight(1874f), FromTop(18f), Px(28f), Px(28f));
+
         // フォント。通常と太字は別のファイルを使う(Unityに太字を合成させると、小さい漢字の線が潰れて読めなくなった)
         private Font _fontRegular;
         private Font _fontBold;
@@ -128,21 +148,27 @@ namespace BangsEdge.Game
             solidTex.Apply();
             _solidWhiteSprite = Sprite.Create(solidTex, new Rect(0, 0, 1, 1), new Vector2(0.5f, 0.5f), 1f);
 
-            // 2. 密度バー背景 + 枠 (2x: 840x28, 角丸4px = 8実px, 枠線幅1px = 2実px)
+            // 2. 密度バー背景 + 枠 (JS版で幅420・高さ14・角丸4・枠線1の論理px を HudScale 倍し、論理1pxを2テクセルで描く)
             _barBgSprite = CreateBarBackgroundSprite();
 
-            // 3. 密度バー塗り用 9-slice スプライト (32x32, 角丸8実px, border 8px, PPU 2 = 論理角丸4px)
+            // 3. 密度バー塗り用 9-slice スプライト (32x32, 角丸8テクセル, border 8)
             _barFillSprite = CreateBarFillSprite();
 
-            // 4. ミュートボタン用スプライト (4x: 112x112, 28x28論理px, 角丸6px, スピーカー/×/音波)
+            // 4. ミュートボタン用スプライト (112x112テクセル, JS版の28x28論理px, 角丸6px, スピーカー/×/音波)
             _muteBtnMutedSprite = CreateMuteButtonSprite(true);
             _muteBtnUnmutedSprite = CreateMuteButtonSprite(false);
         }
 
         private Sprite CreateBarBackgroundSprite()
         {
-            int w = 840;
-            int h = 28;
+            const float texelsPerPx = 2f;
+            float halfW = Px(420f) * 0.5f;
+            float halfH = Px(14f) * 0.5f;
+            float radius = Px(4f);
+            float borderWidth = Px(1f);
+
+            int w = Mathf.RoundToInt(halfW * 2f * texelsPerPx);
+            int h = Mathf.RoundToInt(halfH * 2f * texelsPerPx);
             var tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
             tex.filterMode = FilterMode.Bilinear;
             var colors = new Color32[w * h];
@@ -152,26 +178,26 @@ namespace BangsEdge.Game
 
             for (int y = 0; y < h; y++)
             {
-                float ly = ((h - 1 - y) + 0.5f) / 2.0f; // 論理y (0〜14)
+                float ly = ((h - 1 - y) + 0.5f) / texelsPerPx; // 論理y
                 for (int x = 0; x < w; x++)
                 {
-                    float lx = (x + 0.5f) / 2.0f; // 論理x (0〜420)
-                    float relX = lx - 210f;
-                    float relY = ly - 7f;
-                    float qx = Mathf.Abs(relX) - (210f - 4f);
-                    float qy = Mathf.Abs(relY) - (7f - 4f);
+                    float lx = (x + 0.5f) / texelsPerPx; // 論理x
+                    float relX = lx - halfW;
+                    float relY = ly - halfH;
+                    float qx = Mathf.Abs(relX) - (halfW - radius);
+                    float qy = Mathf.Abs(relY) - (halfH - radius);
                     float dOuter = Mathf.Sqrt(Mathf.Max(qx, 0f) * Mathf.Max(qx, 0f) + Mathf.Max(qy, 0f) * Mathf.Max(qy, 0f))
-                                   + Mathf.Min(Mathf.Max(qx, qy), 0f) - 4f;
+                                   + Mathf.Min(Mathf.Max(qx, qy), 0f) - radius;
 
-                    float alphaOuter = Mathf.Clamp01(0.5f - dOuter * 2.0f);
+                    float alphaOuter = Mathf.Clamp01(0.5f - dOuter * texelsPerPx);
                     if (alphaOuter <= 0f)
                     {
                         colors[y * w + x] = new Color32(0, 0, 0, 0);
                         continue;
                     }
 
-                    float dInner = dOuter + 1.0f;
-                    float alphaInner = Mathf.Clamp01(0.5f - dInner * 2.0f);
+                    float dInner = dOuter + borderWidth;
+                    float alphaInner = Mathf.Clamp01(0.5f - dInner * texelsPerPx);
                     float alphaBorder = Mathf.Max(0f, alphaOuter - alphaInner);
 
                     colors[y * w + x] = Composite(bgCol, alphaInner, borderCol, alphaBorder);
@@ -207,14 +233,15 @@ namespace BangsEdge.Game
 
             tex.SetPixels32(colors);
             tex.Apply();
-            // The texture is drawn at 2x. Sliced borders are measured against the canvas's
-            // referencePixelsPerUnit (100), so 200 makes the 8-texel border 4 logical px.
+            // Sliced borders are measured against the canvas's referencePixelsPerUnit (100),
+            // so 200 makes the 8-texel border 4 logical px (the web version's corner radius)
+            // and dividing by HudScale scales the corner with the bar.
             // With 2 the border became 400 units and the fill stretched into a long pill.
             return Sprite.Create(
                 tex,
                 new Rect(0, 0, size, size),
                 new Vector2(0f, 0.5f),
-                200f,
+                200f / HudScale,
                 0,
                 SpriteMeshType.FullRect,
                 new Vector4(8, 8, 8, 8)
@@ -384,11 +411,13 @@ namespace BangsEdge.Game
             rootRt.offsetMin = Vector2.zero;
             rootRt.offsetMax = Vector2.zero;
 
-            // 1. 密度バー (左上 750, 24, 幅420, 高さ14)
+            // 以下の数値はJS版の論理px。From*/Px で HudScale 倍する
+
+            // 1. 密度バー (JS版: 左上 750, 24, 幅420, 高さ14)
             var barRoot = new GameObject("DensityBar");
             barRoot.transform.SetParent(hudRoot.transform, false);
             var barRt = barRoot.AddComponent<RectTransform>();
-            SetTopLeft(barRt, new Vector2(750f, -24f), new Vector2(420f, 14f));
+            SetTopLeft(barRt, new Vector2(FromCenterX(750f), -FromTop(24f)), new Vector2(Px(420f), Px(14f)));
 
             // バー背景 + 枠
             var barBgGo = new GameObject("Bg");
@@ -407,7 +436,7 @@ namespace BangsEdge.Game
             fillRt.anchorMax = new Vector2(0f, 0.5f);
             fillRt.pivot = new Vector2(0f, 0.5f);
             fillRt.anchoredPosition = Vector2.zero;
-            fillRt.sizeDelta = new Vector2(0f, 14f);
+            fillRt.sizeDelta = new Vector2(0f, Px(14f));
             _barFillImage = barFillGo.AddComponent<Image>();
             _barFillImage.sprite = _barFillSprite;
             _barFillImage.type = Image.Type.Sliced;
@@ -421,8 +450,8 @@ namespace BangsEdge.Game
             lineRt.anchorMin = new Vector2(0f, 1f);
             lineRt.anchorMax = new Vector2(0f, 1f);
             lineRt.pivot = new Vector2(0.5f, 1f);
-            lineRt.anchoredPosition = new Vector2(1107f, -21f);
-            lineRt.sizeDelta = new Vector2(2f, 20f);
+            lineRt.anchoredPosition = new Vector2(FromCenterX(1107f), -FromTop(21f));
+            lineRt.sizeDelta = new Vector2(Px(2f), Px(20f));
             _limitLineImage = limitLineGo.AddComponent<Image>();
             _limitLineImage.sprite = _solidWhiteSprite;
             _limitLineImage.color = new Color(1f, 51f / 255f, 51f / 255f, 1f);
@@ -433,12 +462,12 @@ namespace BangsEdge.Game
                 hudRoot.transform,
                 "LimitLabel",
                 "BANG LIMIT (85%)",
-                10,
+                Px(10),
                 FontStyle.Bold,
                 new Color(1f, 68f / 255f, 68f / 255f, 1f),
                 TextAnchor.LowerCenter,
-                1107f,
-                53f
+                FromCenterX(1107f),
+                FromTop(53f)
             );
 
             // 3. 危険度ステージ表示 (ベースライン y=16, x=960, 太字12)
@@ -446,12 +475,12 @@ namespace BangsEdge.Game
                 hudRoot.transform,
                 "DangerStage",
                 "DANGER: SAFE",
-                12,
+                Px(12),
                 FontStyle.Bold,
                 new Color(148f / 255f, 163f / 255f, 184f / 255f, 1f),
                 TextAnchor.LowerCenter,
-                960f,
-                16f
+                FromCenterX(960f),
+                FromTop(16f)
             );
 
             // 4. 射程可視化表示 (Attracting時のみ)
@@ -465,12 +494,12 @@ namespace BangsEdge.Game
                 _reachGroup.transform,
                 "ReachCount",
                 $"射程内 0 / {GameConfig.TOTAL_PARTICLES}  (必要 {GameConfig.REQUIRED_PARTICLES})",
-                11,
+                Px(11),
                 FontStyle.Bold,
                 new Color(148f / 255f, 163f / 255f, 184f / 255f, 0.9f),
                 TextAnchor.LowerCenter,
-                960f,
-                70f
+                FromCenterX(960f),
+                FromTop(70f)
             );
 
             // 2行目: 到達不能警告 (ベースライン y=86, x=960, 太字12)
@@ -478,12 +507,12 @@ namespace BangsEdge.Game
                 _reachGroup.transform,
                 "UnreachWarn",
                 "この位置では到達不能 — 画面の中央へ",
-                12,
+                Px(12),
                 FontStyle.Bold,
                 new Color(1f, 68f / 255f, 68f / 255f, 1f),
                 TextAnchor.LowerCenter,
-                960f,
-                86f
+                FromCenterX(960f),
+                FromTop(86f)
             );
             _reachGroup.SetActive(false);
 
@@ -492,12 +521,12 @@ namespace BangsEdge.Game
                 hudRoot.transform,
                 "Fps",
                 "60 fps",
-                10,
+                Px(10),
                 FontStyle.Normal,
                 new Color(148f / 255f, 163f / 255f, 184f / 255f, 0.55f),
                 TextAnchor.LowerLeft,
-                16f,
-                1064f
+                FromLeft(16f),
+                FromBottom(1064f)
             );
 
             // 6. スコア (左上 20, 36, 太字16, 白)
@@ -505,12 +534,12 @@ namespace BangsEdge.Game
                 hudRoot.transform,
                 "Score",
                 "SCORE: 0000",
-                16,
+                Px(16),
                 FontStyle.Bold,
                 Color.white,
                 TextAnchor.LowerLeft,
-                20f,
-                36f
+                FromLeft(20f),
+                FromTop(36f)
             );
 
             // 7. ハイスコア (右上 x=1860, y=36, 太字16, #ffd700, 右揃え)
@@ -518,22 +547,22 @@ namespace BangsEdge.Game
                 hudRoot.transform,
                 "HighScore",
                 "HIGH: 0000",
-                16,
+                Px(16),
                 FontStyle.Bold,
                 new Color(1f, 215f / 255f, 0f, 1f),
                 TextAnchor.LowerRight,
-                1860f,
-                36f
+                FromRight(1860f),
+                FromTop(36f)
             );
 
             // 8. 中央文字群 (状態ごと、中央揃え x=960)
             BuildCenterTexts(hudRoot.transform);
 
-            // 9. ミュートボタン (左上 1874, 18, 幅28, 高さ28)
+            // 9. ミュートボタン (JS版: 左上 1874, 18, 幅28, 高さ28)
             var muteGo = new GameObject("MuteButton");
             muteGo.transform.SetParent(hudRoot.transform, false);
             var muteRt = muteGo.AddComponent<RectTransform>();
-            SetTopLeft(muteRt, new Vector2(1874f, -18f), new Vector2(28f, 28f));
+            SetTopLeft(muteRt, new Vector2(MuteButtonRect.x, -MuteButtonRect.y), MuteButtonRect.size);
             _muteBtnImage = muteGo.AddComponent<Image>();
             _muteBtnImage.sprite = _muteBtnUnmutedSprite;
             _muteBtnImage.raycastTarget = false;
@@ -551,20 +580,20 @@ namespace BangsEdge.Game
             _readyGroup.transform.SetParent(centerRoot.transform, false);
             SetFillParent(_readyGroup.AddComponent<RectTransform>());
 
-            CreateText(_readyGroup.transform, "Title", "BANG'S-EDGE", 22, FontStyle.Bold, Color.white, TextAnchor.LowerCenter, 960f, 520f);
-            CreateText(_readyGroup.transform, "Sub1", "CLICK & HOLD TO ACCUMULATE PARTICLES", 14, FontStyle.Normal, new Color(148f / 255f, 163f / 255f, 184f / 255f, 1f), TextAnchor.LowerCenter, 960f, 555f);
-            CreateText(_readyGroup.transform, "Sub2", "RELEASE BEFORE BIG BANG TO LOCK SCORE", 14, FontStyle.Normal, new Color(148f / 255f, 163f / 255f, 184f / 255f, 1f), TextAnchor.LowerCenter, 960f, 578f);
+            CreateText(_readyGroup.transform, "Title", "BANG'S-EDGE", Px(22), FontStyle.Bold, Color.white, TextAnchor.LowerCenter, FromCenterX(960f), FromCenterY(520f));
+            CreateText(_readyGroup.transform, "Sub1", "CLICK & HOLD TO ACCUMULATE PARTICLES", Px(14), FontStyle.Normal, new Color(148f / 255f, 163f / 255f, 184f / 255f, 1f), TextAnchor.LowerCenter, FromCenterX(960f), FromCenterY(555f));
+            CreateText(_readyGroup.transform, "Sub2", "RELEASE BEFORE BIG BANG TO LOCK SCORE", Px(14), FontStyle.Normal, new Color(148f / 255f, 163f / 255f, 184f / 255f, 1f), TextAnchor.LowerCenter, FromCenterX(960f), FromCenterY(578f));
 
             // --- Resolved ---
             _resolvedGroup = new GameObject("ResolvedGroup");
             _resolvedGroup.transform.SetParent(centerRoot.transform, false);
             SetFillParent(_resolvedGroup.AddComponent<RectTransform>());
 
-            CreateText(_resolvedGroup.transform, "Title", "ROUND RESOLVED!", 24, FontStyle.Bold, new Color(0f, 229f / 255f, 1f, 1f), TextAnchor.LowerCenter, 960f, 515f);
-            _resolvedScoreText = CreateText(_resolvedGroup.transform, "Score", "SCORE: 0", 36, FontStyle.Bold, Color.white, TextAnchor.LowerCenter, 960f, 558f);
-            _resolvedNewHighText = CreateText(_resolvedGroup.transform, "NewHigh", "★ NEW HIGH SCORE! ★", 14, FontStyle.Bold, new Color(1f, 215f / 255f, 0f, 1f), TextAnchor.LowerCenter, 960f, 585f);
+            CreateText(_resolvedGroup.transform, "Title", "ROUND RESOLVED!", Px(24), FontStyle.Bold, new Color(0f, 229f / 255f, 1f, 1f), TextAnchor.LowerCenter, FromCenterX(960f), FromCenterY(515f));
+            _resolvedScoreText = CreateText(_resolvedGroup.transform, "Score", "SCORE: 0", Px(36), FontStyle.Bold, Color.white, TextAnchor.LowerCenter, FromCenterX(960f), FromCenterY(558f));
+            _resolvedNewHighText = CreateText(_resolvedGroup.transform, "NewHigh", "★ NEW HIGH SCORE! ★", Px(14), FontStyle.Bold, new Color(1f, 215f / 255f, 0f, 1f), TextAnchor.LowerCenter, FromCenterX(960f), FromCenterY(585f));
             _resolvedNewHighText.gameObject.SetActive(false);
-            CreateText(_resolvedGroup.transform, "Sub", "CLICK TO START NEXT ROUND", 14, FontStyle.Normal, new Color(148f / 255f, 163f / 255f, 184f / 255f, 1f), TextAnchor.LowerCenter, 960f, 615f);
+            CreateText(_resolvedGroup.transform, "Sub", "CLICK TO START NEXT ROUND", Px(14), FontStyle.Normal, new Color(148f / 255f, 163f / 255f, 184f / 255f, 1f), TextAnchor.LowerCenter, FromCenterX(960f), FromCenterY(615f));
 
             // --- Bang ---
             _bangGroup = new GameObject("BangGroup");
@@ -573,10 +602,10 @@ namespace BangsEdge.Game
 
             // JSはこの文字に赤いぼかし影(shadowBlur 15)を付けている。uGUIの Outline と Shadow で真似たところ、
             // 文字がずれて二重・三重に重なり読めなくなった(ユーザー確認)ので付けない。発光の再現はUIの微調整で扱う
-            CreateText(_bangGroup.transform, "Title", "BIG BANG DETECTED!", 32, FontStyle.Bold, new Color(1f, 34f / 255f, 0f, 1f), TextAnchor.LowerCenter, 960f, 520f);
+            CreateText(_bangGroup.transform, "Title", "BIG BANG DETECTED!", Px(32), FontStyle.Bold, new Color(1f, 34f / 255f, 0f, 1f), TextAnchor.LowerCenter, FromCenterX(960f), FromCenterY(520f));
 
-            CreateText(_bangGroup.transform, "Fail", "ROUND FAILED — SCORE: 0", 18, FontStyle.Bold, new Color(1f, 163f / 255f, 158f / 255f, 1f), TextAnchor.LowerCenter, 960f, 560f);
-            CreateText(_bangGroup.transform, "Sub", "CLICK TO RETRY", 14, FontStyle.Normal, new Color(148f / 255f, 163f / 255f, 184f / 255f, 1f), TextAnchor.LowerCenter, 960f, 595f);
+            CreateText(_bangGroup.transform, "Fail", "ROUND FAILED — SCORE: 0", Px(18), FontStyle.Bold, new Color(1f, 163f / 255f, 158f / 255f, 1f), TextAnchor.LowerCenter, FromCenterX(960f), FromCenterY(560f));
+            CreateText(_bangGroup.transform, "Sub", "CLICK TO RETRY", Px(14), FontStyle.Normal, new Color(148f / 255f, 163f / 255f, 184f / 255f, 1f), TextAnchor.LowerCenter, FromCenterX(960f), FromCenterY(595f));
 
             _readyGroup.SetActive(true);
             _resolvedGroup.SetActive(false);
@@ -683,12 +712,12 @@ namespace BangsEdge.Game
         private void UpdateDensityBar(BangSimulation sim, double nowMs)
         {
             double fillRatio = Math.Max(0.0, Math.Min(1.0, sim.CurrentDensity / GameConfig.DENSITY_MAX));
-            float fillW = (float)(420.0 * fillRatio);
+            float fillW = (float)(Px(420f) * fillRatio);
 
             if (fillW > 0f)
             {
                 if (!_barFillImage.enabled) _barFillImage.enabled = true;
-                _barFillImage.rectTransform.sizeDelta = new Vector2(fillW, 14f);
+                _barFillImage.rectTransform.sizeDelta = new Vector2(fillW, Px(14f));
 
                 Color targetCol;
                 if (sim.Stage == DangerStage.Warm)
