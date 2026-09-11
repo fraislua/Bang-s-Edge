@@ -48,8 +48,8 @@ namespace BangsEdge.Game
             if (seed == 0) seed = 1;
             var rng = new Mulberry32(seed);
 
-            // シミュレーション初期化 (オーディオイベントはP6で実装するため現段階ではnull)
-            _sim = new BangSimulation(rng, null);
+            // シミュレーション初期化 (WebAudioEvents 経由で WebGL 音響イベントを中継)
+            _sim = new BangSimulation(rng, new WebAudioEvents());
             _sim.HighScore = _savedHighScore;
 
             _lastTimestamp = 0.0;
