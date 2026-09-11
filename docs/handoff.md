@@ -113,7 +113,7 @@ node tools/web-shot/cdp-audio-check.mjs <url> <outDir> <name> [bangHoldMs]
 5. **165Hz表示では動きが60Hzに量子化される**(固定ステップの副作用)。指摘は無し。
 6. **ゲームバランスは煮詰め途中**(`R_MAX_RATIO`・`F_CREEP`・揺動振幅)。易しくする方向の調整は確認してから。
 7. **`docs/game-concept.md`の「音」の節が古い**(現行の`audio.js`はgrok設計の7ノード構成)。未確定事項2つ(「一度離したら即終了」で良いか、ビッグバン演出の作り込み)も残る。
-8. **unityroom投稿とランキング**: Unity版ができたので技術的には可能になった(以前ユーザーは「今は行わない」と明言)。圧縮形式はunityroomで実績のあるGzip(`Eclipse-Diver`)、フォントのクレジット(OFL)が必要。
+8. **unityroom投稿(初版を出す方針、ランキングは未定)**: 圧縮形式はGzip(`Eclipse-Diver`で実績)。**Gzipビルドを手元で確認済み**(2026-09-11): `unity build ... --args "-webglCompression Gzip"` を `unity/Build/WebGL-gzip` に出力し、`node tools/web-shot/serve-gzip.mjs unity/Build/WebGL-gzip 8767`(`.gz`に`Content-Encoding: gzip`を付けて配信。`python -m http.server`ではGzipビルドは動かない)で配信して、画面・音・ミュート・音量を確認した。出力は `loader.js` 27KB・`framework.js.gz` 96KB・`data.gz` 10.7MB・`wasm.gz` 12MB の計約23MB。内訳はフォント8.9MB、Unityロゴ画像2.7MB、URPのポストエフェクト素材約3MBなどで、縮小案(フォントを使う文字だけにする等)はあるが**ユーザー判断で行わない**(23MBなら問題ない)。**起動時のUnityロゴ画面は現在オン**(`m_ShowUnitySplashScreen: 1`、ゲームの枠内に出るのでunityroomでも表示される)。記事によってアップロード形式の書き方が違う(Buildフォルダの4ファイル/中身をzip)ので投稿画面で確認する。画面サイズも投稿画面を見てから決める(既定960×540では粒子が1〜2pxになる)。フォントのクレジット(BIZ UDゴシック、SIL OFL 1.1、Reserved Font Nameなし)を説明文に書く。
 9. **細かい残り**: Unity Cloudのプロジェクト紐付け(`cloudProjectId`、無効化状態)を外すか / 不要パッケージ(Visual Scripting等)の整理 / MCPの未検証2点(推論トークンだけで出力上限を使い切る経路、326秒超の`compare`)。
 10. **追加の視覚演出: 背景の遠い星(ユーザー案、2026-09-11)** → **初版に入れることに決定し、実装済み(ユーザーが2回試遊して確認)**(`docs/unity-port-plan.md` §5-8、`StarfieldRenderer.cs`)。以下は案の段階の記録。
     - 背景に、遠くの星が光っているような表現を置く。**実際に集める粒子と見比べられる(区別できる)表現**が望ましい。
