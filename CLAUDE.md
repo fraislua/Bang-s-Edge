@@ -1,6 +1,6 @@
 # CLAUDE.md — Bang's-Edge
 
-長押しで遊ぶゲーム(PCはマウス、スマホはタッチ)。JS版をGitHub Pagesで公開していたが、2026-09-11にUnity(WebGL)へ移植し(`unity/`)、**unityroomで公開済み(スコアとビッグバン最短時間のランキング付き、スマホ対応済み)**。**リポジトリは2026-09-11にいったん非公開にしたが、公開に戻すとユーザーが決めた**(切り替えはユーザーが行う。Pagesの設定は残っていない)。本プロジェクトは同時に2つの実験を兼ねる: (1) discord-ai-hub MCP統合構想(`docs/concept-ai-hub-integration.md`)の実地検証、(2) **Claude Codeからどれだけタスクを分散させられるかの実験**。
+長押しで遊ぶゲーム(PCはマウス、スマホはタッチ)。JS版をGitHub Pagesで公開していたが、2026-09-11にUnity(WebGL)へ移植し(`unity/`)、**unityroomで公開済み(スコアとビッグバン最短時間のランキング付き、スマホ対応済み)**。**リポジトリは公開**(2026-09-11にいったん非公開にし、同日に公開へ戻した。ライセンスはMIT)。JS版はGitHub Pagesで「調整段階の旧バージョン」として公開中。本プロジェクトは同時に2つの実験を兼ねる: (1) discord-ai-hub MCP統合構想(`docs/concept-ai-hub-integration.md`)の実地検証、(2) **Claude Codeからどれだけタスクを分散させられるかの実験**。
 
 ## Brainとしての役割(2026-09-10方針)
 
@@ -50,6 +50,6 @@ agy --model <model> --mode accept-edits --add-dir "<このリポジトリの絶�
 ## 技術スタック(2026-09-11にUnityへの移植を開始)
 
 - **移植先(`unity/`)**: Unity 6000.3.11f1・URP(Universal 2D)・C#。ターゲットはWebGL。移植方針・作業分割・検証方法は`docs/unity-port-plan.md`。ビルド手順は`docs/dev-notes.md`。**unityroomへの公開ビルドは、ユーザーがエディターからビルドプロファイル`Web - Mobile - Release`で手動ビルドする**(Brainのバッチビルドは投稿で弾かれたことがある)。ランキングのHMACキーは`unity/Assets/Resources/Secrets/unityroom-hmac.txt`(gitignore済み、コミットしない)。手順は`docs/handoff.md` §1。
-- **JS版(リポジトリ直下)**: 素のHTML/CSS/JS(Canvas API)、ビルド無し。移植前の現行版(Pagesの設定は無いので、確認はローカルで配信する)で、**物理のロジックの基準**。Unity版は設定値3つ(揺動を止めて`TAU_R`を8に)を意図的に変えてあり、JS版は以前の遊びのまま残す(ユーザー判断、`docs/unity-port-plan.md` §5-6)。
+- **JS版(リポジトリ直下)**: 素のHTML/CSS/JS(Canvas API)、ビルド無し。移植前の版で、GitHub Pagesで「調整段階の旧バージョン」として公開中(変更を確かめるときはローカルで配信する)で、**物理のロジックの基準**。Unity版は設定値3つ(揺動を止めて`TAU_R`を8に)を意図的に変えてあり、JS版は以前の遊びのまま残す(ユーザー判断、`docs/unity-port-plan.md` §5-6)。
 - 仕様の正本は`docs/game-concept.md`の「実装仕様」(JS版・Unity版共通)。
 - **agyはターミナルを使えないのでUnityのコンパイル・テスト・ビルドはできない。** 委任したC#は、Brainが`unity build`/`unity test`で確認する。

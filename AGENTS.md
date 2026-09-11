@@ -10,7 +10,7 @@
 
 - ジャンル: 長押しで遊ぶゲーム(PCはマウス、スマホはタッチ)。
 - **2026-09-11にUnityへ移植し、unityroomで公開済み**(スコアとビッグバン最短時間のランキング付き、スマホ対応済み)。移植先は`unity/`(Unity 6000.3.11f1、URP(Universal 2D)、C#、ターゲットはWebGL)。
-- **JS版**(リポジトリ直下の`index.html`/`style.css`/`config.js`/`script.js`/`audio.js`、素のHTML/CSS/JS・Canvas API)は移植前の現行版(GitHub Pagesの設定は無く、確認はローカルで配信する)で、**物理のロジックの基準**。依頼が無い限り変更しない。Unity版は設定値3つ(`WOBBLE_AX`/`WOBBLE_AY`=0、`TAU_R`=8)を意図的にJS版と変えてある(`docs/unity-port-plan.md` §5-6)。
+- **JS版**(リポジトリ直下の`index.html`/`style.css`/`config.js`/`script.js`/`audio.js`、素のHTML/CSS/JS・Canvas API)は移植前の版で、GitHub Pagesで「調整段階の旧バージョン」として公開中(変更を確かめるときはローカルで配信する)。**物理のロジックの基準**。依頼が無い限り変更しない。Unity版は設定値3つ(`WOBBLE_AX`/`WOBBLE_AY`=0、`TAU_R`=8)を意図的にJS版と変えてある(`docs/unity-port-plan.md` §5-6)。
 - 仕様の正本: `docs/game-concept.md`(特に「実装仕様」の数式・パラメータ)。移植方針: `docs/unity-port-plan.md`。
 
 ## 文書体系
@@ -26,7 +26,7 @@
 1. `docs/game-concept.md`との整合性(操作方法・スコアリング・ラウンド構造)。**移植では、JS版と同じ数式・定数・更新の順序になっているか**
 2. コード品質(不要な複雑化・デッドコード・命名の明確さ)
 3. パフォーマンス(描画、粒子数増加時のフレームレート低下の可能性)
-4. 動作環境: Unity版はWebGLビルドで動くこと(WebGLで使えない機能に依存しない)。JS版はビルド無しの静的サイトとして動くこと(GitHub Pagesの設定は今は無いが、再公開できる状態を保つ)
+4. 動作環境: Unity版はWebGLビルドで動くこと(WebGLで使えない機能に依存しない)。JS版はビルド無しの静的サイトとして動くこと(GitHub Pagesで公開中。`.nojekyll`でファイルをそのまま配信している)
 
 ## Unity版の作業上の注意
 

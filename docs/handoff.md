@@ -12,7 +12,7 @@
 
 **Unity版をunityroomで公開した(2026-09-11)。ランキング2つ(スコア、ビッグバン最短時間)も動いている(ユーザーが反映を確認)。**
 
-- **GitHub**: `fraislua/Bang-s-Edge`は2026-09-11にいったん非公開にしたが、unityroomへの公開とスマホ対応が済んだので**公開に戻すとユーザーが決めた**(切り替えはユーザーが行う。公開前の点検結果は`docs/dev-notes.md`)。GitHub Pagesの設定は残っていない(`has_pages: false`)ので、公開してもJS版は自動では出ない。PagesでJS版を再公開するかは未決定。**すべてpush済み**(未pushは`git log --oneline origin/main..HEAD`で確認)。
+- **GitHub**: `fraislua/Bang-s-Edge`は**公開**(2026-09-11にいったん非公開にし、unityroomへの公開とスマホ対応の後、同日に公開へ戻した。公開前の点検結果と、Pagesを作り直した手順は`docs/dev-notes.md`)。ライセンスはMIT。**JS版はGitHub Pagesで旧バージョンとして公開中**(https://fraislua.github.io/Bang-s-Edge/ 。右下に「開発途中(調整段階)の旧バージョン」とunityroomへのリンク)。**すべてpush済み**(未pushは`git log --oneline origin/main..HEAD`で確認)。
 - **未追跡の`gif/`**: ユーザーがアイコン用に作った素材。コミットするかは聞いていない(触らない)。
 - **JS版**(リポジトリ直下): 以前の遊び(揺動あり)のまま残す(ユーザー判断)。**物理のロジックの基準**で、`golden.js`はこれを動かしてUnity版の基準データを作る。確認するときは`python -m http.server <port> --bind 127.0.0.1`で配信する。
 - **Unity版**(`unity/`): Unity 6000.3.11f1、URP(Universal 2D)、C#、WebGL。**JS版から意図的に変えた点**(すべて`docs/unity-port-plan.md` §5):
@@ -129,7 +129,7 @@ node tools/web-shot/cdp-audio-check.mjs <url> <outDir> <name> [bangHoldMs] [hudS
 2. **揺動ありを別の遊び方として出すか**: ユーザーは「以前のランダム性にも別の面白さがあった」と言っている(JS版は揺動ありのまま)。
 3. **ゲームバランス**(`R_MAX_RATIO`・`F_CREEP`・`TAU_R`)は煮詰め途中。易しくする方向は確認してから。
 4. **仕様書の更新**: `docs/game-concept.md`の「音」の節が古い。Unity版だけの要素(HUD倍率・音量・星・ランキング)は仕様書に無く、`docs/unity-port-plan.md` §5にある。未確定事項2つ(「一度離したら即終了」で良いか、ビッグバン演出の作り込み)も残る。
-5. **GitHubの扱い**(2026-09-11にユーザーが決定): 公開に戻す(切り替えはユーザー) / ライセンスはMIT(同梱フォントはOFLのまま) / **JS版はGitHub Pagesで再公開する**。画面の右下に「開発途中(調整段階)の旧バージョン」とunityroomへのリンクを出し、Jekyllの変換を止める`.nojekyll`を置いた。**Pagesの有効化は、リポジトリが公開になってからBrainが行う**(無料プランは非公開のリポジトリでPagesを使えない)。unityroomのURLは https://unityroom.com/games/bang-s-edge 。残っているのは、Unity版の到達点にタグを打つか(既存は`v1`・`v1.1`) / コミットの作者欄のメールアドレスをそのままにするか(`docs/dev-notes.md`。Brainは書き換えないことを推奨)。
+5. **GitHubの扱い**: 公開・MITライセンス(同梱フォントはOFLのまま)・JS版のGitHub Pagesでの再公開は済んだ(2026-09-11)。JS版の画面の右下に「開発途中(調整段階)の旧バージョン」とunityroomへのリンクを出し、Jekyllの変換を止める`.nojekyll`を置いてある。unityroomのURLは https://unityroom.com/games/bang-s-edge 。残っているのは、Unity版の到達点にタグを打つか(既存は`v1`・`v1.1`) / コミットの作者欄のメールアドレスをそのままにするか(`docs/dev-notes.md`。Brainは書き換えないことを推奨)。
 6. **165Hz表示では動きが60Hzに量子化される**(固定ステップの副作用)。指摘は無し。
 7. **ビルドの縮小案**(フォントを使う文字だけにする8.9MB減など)はユーザー判断で見送り。容量で困ったら再検討。
 8. **細かい残り**: Unity Cloudの紐付け(`cloudProjectId`)を外すか / 不要パッケージ(Visual Scripting等)の整理 / vivoxスキルを残すか / MCPの未検証2点(推論トークンだけで出力上限を使い切る経路、326秒超の`compare`)。
