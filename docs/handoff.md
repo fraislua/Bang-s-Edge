@@ -24,6 +24,13 @@
   - 起動時のUnityロゴ画面を外した
   - **unityroomランキング**: ボード1=確定したスコア(降順)、ボード2=押してから爆発までの秒(昇順、小数点以下2桁)。ラウンドごとに自動送信。爆発画面にBANG TIMEと自己ベスト
 
+### スマホ対応(2026-09-11着手、未公開)
+
+- 決定と理由は`docs/unity-port-plan.md` §5-10(指の少し上に集める・横向き前提・実機はAndroidのChrome)。
+- **公開中の版はタッチでは遊べない**(長押ししてもラウンドが始まらない。ヘッドレスChromeのタッチ再現で確認、`docs/dev-notes.md`)。
+- 入れたもの: 入力を`Pointer.current`に / タッチのときだけ引き寄せる点を指の60 CSS px上へ(`GameManager.TOUCH_CURSOR_OFFSET_CSS_PX`、試遊で調整) / ミュートとスライダーの当たり判定を上下に44 CSS pxまで拡大 / 案内文をTOUCH・TAPに切り替え / 縦向きは全画面の案内(`OrientationNotice`) / `touch-gestures.jspre`(長押しの文字選択・メニュー、スクロール、タップ後の疑似マウスを抑止) / `audio-unlock.jspre`(指を離したときにも音を開始) / `BangsDisplay.jslib`(キャンバスのCSS倍率とcoarse pointer)。
+- **ヘッドレスChromeのタッチ再現では全項目が通った**(`node tools/web-shot/cdp-touch-check.mjs <url> <outDir> <name> [width] [height] [dpr]`)。**次はAndroidのChrome実機での確認**: ずらす量、音、長押しで何も出ないか、fps、unityroomのページ内での表示。PCの配信をLANに出す(`--bind 0.0.0.0`、PCは`192.168.0.53`)とファイアウォールの確認が出ることがあるので、ユーザーに確かめてから。確認できたら、ユーザーがビルドプロファイルでビルドして投稿する。
+
 ### unityroomへ公開ビルドを出す手順(次の更新でもこのとおりにする)
 
 1. **HMACキーを置く**: `unity/Assets/Resources/Secrets/unityroom-hmac.txt`にキーの文字列だけを書く。**gitignore済みでコミットしない**。無いと送信しない(警告ログのみ)。Brainの確認用にダミーのキーを置いたら、確認後に必ず消す(残すとダミーで公開してしまう)。

@@ -90,6 +90,11 @@ namespace BangsEdge.Game
         private GameObject _bangGroup;
         private Text _bangTimeText;
         private Text _bangNewBestText;
+        private Text _readySub1Text;
+        private Text _resolvedSubText;
+        private Text _bangSubText;
+        private bool _isTouchLabelsInitialized;
+        private bool _lastTouchLabelsMode;
 
         // ミュートボタン
         private Image _muteBtnImage;
@@ -683,7 +688,7 @@ namespace BangsEdge.Game
             SetFillParent(_readyGroup.AddComponent<RectTransform>());
 
             CreateText(_readyGroup.transform, "Title", "BANG'S-EDGE", Px(22), FontStyle.Bold, Color.white, TextAnchor.LowerCenter, FromCenterX(960f), FromCenterY(520f));
-            CreateText(_readyGroup.transform, "Sub1", "CLICK & HOLD TO ACCUMULATE PARTICLES", Px(14), FontStyle.Normal, new Color(148f / 255f, 163f / 255f, 184f / 255f, 1f), TextAnchor.LowerCenter, FromCenterX(960f), FromCenterY(555f));
+            _readySub1Text = CreateText(_readyGroup.transform, "Sub1", "CLICK & HOLD TO ACCUMULATE PARTICLES", Px(14), FontStyle.Normal, new Color(148f / 255f, 163f / 255f, 184f / 255f, 1f), TextAnchor.LowerCenter, FromCenterX(960f), FromCenterY(555f));
             CreateText(_readyGroup.transform, "Sub2", "RELEASE BEFORE BIG BANG TO LOCK SCORE", Px(14), FontStyle.Normal, new Color(148f / 255f, 163f / 255f, 184f / 255f, 1f), TextAnchor.LowerCenter, FromCenterX(960f), FromCenterY(578f));
 
             // --- Resolved ---
@@ -695,7 +700,7 @@ namespace BangsEdge.Game
             _resolvedScoreText = CreateText(_resolvedGroup.transform, "Score", "SCORE: 0", Px(36), FontStyle.Bold, Color.white, TextAnchor.LowerCenter, FromCenterX(960f), FromCenterY(558f));
             _resolvedNewHighText = CreateText(_resolvedGroup.transform, "NewHigh", "★ NEW HIGH SCORE! ★", Px(14), FontStyle.Bold, new Color(1f, 215f / 255f, 0f, 1f), TextAnchor.LowerCenter, FromCenterX(960f), FromCenterY(585f));
             _resolvedNewHighText.gameObject.SetActive(false);
-            CreateText(_resolvedGroup.transform, "Sub", "CLICK TO START NEXT ROUND", Px(14), FontStyle.Normal, new Color(148f / 255f, 163f / 255f, 184f / 255f, 1f), TextAnchor.LowerCenter, FromCenterX(960f), FromCenterY(615f));
+            _resolvedSubText = CreateText(_resolvedGroup.transform, "Sub", "CLICK TO START NEXT ROUND", Px(14), FontStyle.Normal, new Color(148f / 255f, 163f / 255f, 184f / 255f, 1f), TextAnchor.LowerCenter, FromCenterX(960f), FromCenterY(615f));
 
             // --- Bang ---
             _bangGroup = new GameObject("BangGroup");
@@ -710,11 +715,43 @@ namespace BangsEdge.Game
             _bangTimeText = CreateText(_bangGroup.transform, "BangTime", "BANG TIME: 0.00s", Px(14), FontStyle.Bold, new Color(226f / 255f, 232f / 255f, 240f / 255f, 1f), TextAnchor.LowerCenter, FromCenterX(960f), FromCenterY(585f));
             _bangNewBestText = CreateText(_bangGroup.transform, "BangNewBest", "★ NEW BEST TIME! ★", Px(14), FontStyle.Bold, new Color(1f, 215f / 255f, 0f, 1f), TextAnchor.LowerCenter, FromCenterX(960f), FromCenterY(607f));
             _bangNewBestText.gameObject.SetActive(false);
-            CreateText(_bangGroup.transform, "Sub", "CLICK TO RETRY", Px(14), FontStyle.Normal, new Color(148f / 255f, 163f / 255f, 184f / 255f, 1f), TextAnchor.LowerCenter, FromCenterX(960f), FromCenterY(632f));
+            _bangSubText = CreateText(_bangGroup.transform, "Sub", "CLICK TO RETRY", Px(14), FontStyle.Normal, new Color(148f / 255f, 163f / 255f, 184f / 255f, 1f), TextAnchor.LowerCenter, FromCenterX(960f), FromCenterY(632f));
 
             _readyGroup.SetActive(true);
             _resolvedGroup.SetActive(false);
             _bangGroup.SetActive(false);
+        }
+
+        /// <summary>
+        /// HUDの中央案内文をマウス用またはタッチ用に切り替える。
+        /// </summary>
+        public void SetTouchLabels(bool useTouch)
+        {
+            // 前回と同じ値なら更新処理を行わない
+            if (_isTouchLabelsInitialized && _lastTouchLabelsMode == useTouch) return;
+            _isTouchLabelsInitialized = true;
+            _lastTouchLabelsMode = useTouch;
+
+            if (_readySub1Text != null)
+            {
+                _readySub1Text.text = useTouch
+                    ? "TOUCH & HOLD TO ACCUMULATE PARTICLES"
+                    : "CLICK & HOLD TO ACCUMULATE PARTICLES";
+            }
+
+            if (_resolvedSubText != null)
+            {
+                _resolvedSubText.text = useTouch
+                    ? "TAP TO START NEXT ROUND"
+                    : "CLICK TO START NEXT ROUND";
+            }
+
+            if (_bangSubText != null)
+            {
+                _bangSubText.text = useTouch
+                    ? "TAP TO RETRY"
+                    : "CLICK TO RETRY";
+            }
         }
 
         private Text CreateText(

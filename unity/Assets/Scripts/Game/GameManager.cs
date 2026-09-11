@@ -12,6 +12,8 @@ namespace BangsEdge.Game
     {
         private const string HIGH_SCORE_KEY = "bangs_edge_high_score";
         private const string BEST_BANG_TIME_KEY = "bangs_edge_best_bang_time";
+        private const float TOUCH_CURSOR_OFFSET_CSS_PX = 60f;
+        private const float TOUCH_MIN_HIT_CSS_PX = 44f;
 
         private BangSimulation _sim;
         private GameRenderer _renderer;
@@ -63,6 +65,9 @@ namespace BangsEdge.Game
             _accumulator = 0.0;
             _fpsEstimate = 60.0;
             _isInitialized = true;
+
+            // HUD案内文を端末の主入力方式に合わせて初期化
+            _hud.SetTouchLabels(WebDisplay.IsCoarsePointer);
         }
 
         private void Update()
@@ -117,33 +122,68 @@ namespace BangsEdge.Game
 
         private void ProcessInput()
         {
-            var mouse = Mouse.current;
-            if (mouse == null) return;
+            var pointer = Pointer.current;
+            if (pointer == null) return;
 
-            Vector2 screenPos = mouse.position.ReadValue();
+            // 縦向き時はプレイ不可のため、引き寄せ中なら終了処理を行って早期リターン
+            bool portraitScreen = Screen.height > Screen.width;
+            if (portraitScreen)
+            {
+                _isDraggingVolume = false;
+                if (_sim != null && _sim.State == GameState.Attracting)
+                {
+                    _sim.ConfirmRound();
+                    CheckSaveHighScore();
+                    HandleRoundTransitions();
+                }
+                return;
+            }
+
+            bool touchInput = pointer is Touchscreen;
+
+            Vector2 screenPos = pointer.position.ReadValue();
             Vector2 logicalPos = _letterbox.ScreenToLogical(screenPos);
             double lx = logicalPos.x;
             double ly = logicalPos.y;
 
-            // 毎フレーム、マウス位置を論理座標に変換してカーソルに設定する
-            _sim.CursorX = lx;
-            _sim.CursorY = ly;
-
-            // 左ボタンを押した瞬間
-            if (mouse.leftButton.wasPressedThisFrame)
+            // カーソル位置の更新:
+            // マウス時は毎フレーム追従するが、タッチ時は指を離している間の座標が不正確なため、
+            // 押下中または押下瞬間のフレームのみ更新し、指で隠れないよう上方向(y引く)へずらす
+            if (!touchInput)
             {
-                // ミュートボタンの矩形判定。大きさはHUDの拡大率に合わせて変わるので、描画側と同じ矩形を使う
+                _sim.CursorX = lx;
+                _sim.CursorY = ly;
+            }
+            else if (pointer.press.isPressed || pointer.press.wasPressedThisFrame)
+            {
+                _sim.CursorX = lx;
+                _sim.CursorY = ly - (double)TOUCH_CURSOR_OFFSET_CSS_PX * (double)WebDisplay.ScreenPixelsPerCssPixel / _letterbox.ViewScale;
+            }
+
+            // 押した瞬間 (StartRoundの前にカーソルが設定される順序を維持)
+            if (pointer.press.wasPressedThisFrame)
+            {
+                // 直前の入力種別に合わせてHUDの案内文を切り替え
+                _hud.SetTouchLabels(touchInput);
+
+                // ミュートボタンの矩形判定。タッチ時は指の太さを考慮して上下のみ当たり判定を広げる
                 Rect muteRect = GameHud.MuteButtonRect;
+                float touchMuteHitPad = touchInput
+                    ? Mathf.Max(0f, (TOUCH_MIN_HIT_CSS_PX * WebDisplay.ScreenPixelsPerCssPixel / (float)_letterbox.ViewScale - muteRect.height) * 0.5f)
+                    : 0f;
                 bool inMuteBtn = lx >= muteRect.xMin &&
                                  lx <= muteRect.xMax &&
-                                 ly >= muteRect.yMin &&
-                                 ly <= muteRect.yMax;
+                                 ly >= muteRect.yMin - touchMuteHitPad &&
+                                 ly <= muteRect.yMax + touchMuteHitPad;
 
                 Rect sliderRect = GameHud.VolumeSliderRect;
+                float touchSliderHitPad = touchInput
+                    ? Mathf.Max(0f, (TOUCH_MIN_HIT_CSS_PX * WebDisplay.ScreenPixelsPerCssPixel / (float)_letterbox.ViewScale - sliderRect.height) * 0.5f)
+                    : 0f;
                 bool inSlider = lx >= sliderRect.xMin &&
                                 lx <= sliderRect.xMax &&
-                                ly >= sliderRect.yMin &&
-                                ly <= sliderRect.yMax;
+                                ly >= sliderRect.yMin - touchSliderHitPad &&
+                                ly <= sliderRect.yMax + touchSliderHitPad;
 
                 if (inMuteBtn)
                 {
@@ -167,7 +207,7 @@ namespace BangsEdge.Game
                     _sim.StartRound(realNowMs);
                 }
             }
-            else if (_isDraggingVolume && mouse.leftButton.isPressed)
+            else if (_isDraggingVolume && pointer.press.isPressed)
             {
                 float v = GameHud.VolumeFromLogicalX(lx);
                 if (Mathf.Abs(v - _lastSetVolume) >= 0.001f)
@@ -177,8 +217,8 @@ namespace BangsEdge.Game
                 }
             }
 
-            // 左ボタンを離した瞬間
-            if (mouse.leftButton.wasReleasedThisFrame)
+            // 離した瞬間
+            if (pointer.press.wasReleasedThisFrame)
             {
                 if (_isDraggingVolume)
                 {
