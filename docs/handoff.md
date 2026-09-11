@@ -1,55 +1,72 @@
 ---
 ファイル名: handoff.md
 ステータス: 引き継ぎメモ(セッション間で随時更新)
-最終更新日: 2026年9月11日(Unity移植がJS版と同等になった時点)
+最終更新日: 2026年9月11日(unityroomで公開し、ランキングを入れた時点)
 ---
 
 # セッション引き継ぎメモ
 
-前回セッションの終了時点の状態と、次に着手できることをまとめたもの。**新しいセッションはまずこれを読むこと。** 詳細は各ドキュメントにあるので、ここには要点と「知らないとハマること」だけを書く。
+前回セッションの終了時点の状態と、次に着手できることをまとめたもの。**新しいセッションはまずこれを読むこと。** 詳細は各ドキュメントにあるので、ここには要点と「知らないとハマること」だけを書く。決定事項の経緯は`docs/unity-port-plan.md` §5、実測と気づきは`docs/dev-notes.md`、委任の成否は`docs/model-experiment-log.md`。
 
 ## 1. 現在の状態
 
-**Unity版がJS版と同等になった(2026-09-11、ユーザー確認済み)。** 物理は数値で、見た目・HUD・音はユーザーがWebGLビルドで確認した。
+**Unity版をunityroomで公開した(2026-09-11)。ランキング2つ(スコア、ビッグバン最短時間)も動いている(ユーザーが反映を確認)。**
 
-- **リポジトリは非公開(2026-09-11、ユーザー判断)**: unityroomに出すまで`fraislua/Bang-s-Edge`を非公開にした。無料プランなのでGitHub Pagesは止まり、https://fraislua.github.io/Bang-s-Edge/ は404になった(切り替え直後に確認)。公開していた2026-09-09〜11の間に、クローンが14回(9か所。多くは自動取得と思われる)あった。
-- **JS版**(リポジトリ直下): 公開ページは停止中。確認するときはリポジトリ直下を`python -m http.server <port> --bind 127.0.0.1`で配信して開く。**以前の遊び(揺動あり)のまま残す**(ユーザー判断)。Unity版とは、設定値3つ(揺動を止めて`TAU_R`を8に、`docs/unity-port-plan.md` §5-6)と音量調節が違う。物理のロジックは同じなので、`golden.js`はこれを動かしてUnity版の基準データを作る。
-- **Unity版**(`unity/`): Unity 6000.3.11f1、URP(Universal 2D)、C#、WebGL。
-- **push済み(2026-09-11)**: Unity移植・HUDの拡大・音量スライダーまで、ユーザーの指示でpushした。以後の未pushは`git log --oneline origin/main..HEAD`で確認する。このpushの時点ではPagesが動いており、公開中のJS版5ファイルがローカルと一致することを確認した(その後、非公開化でPagesは停止)。
-- **pushしても公開ページには反映されない**(非公開の間)。再公開してPagesを戻したら、公開ファイルを`curl`で取得し、改行コードを除いてローカルと比較して反映を確かめる(Pagesは改行がLF、作業ツリーはCRLFになることがある)。
-- タグは`v1`(音なし初版)と`v1.1`(音の完成版)のみ。**Unity版の到達点にタグを打つ候補。**
+- **GitHub**: `fraislua/Bang-s-Edge`は**非公開**(ユーザー判断)。無料プランなのでGitHub Pagesは止まっている(https://fraislua.github.io/Bang-s-Edge/ は404)。公開に戻すか、JS版をPagesで再公開するかは未決定。**すべてpush済み**(未pushは`git log --oneline origin/main..HEAD`で確認)。
+- **未追跡の`gif/`**: ユーザーがアイコン用に作った素材。コミットするかは聞いていない(触らない)。
+- **JS版**(リポジトリ直下): 以前の遊び(揺動あり)のまま残す(ユーザー判断)。**物理のロジックの基準**で、`golden.js`はこれを動かしてUnity版の基準データを作る。確認するときは`python -m http.server <port> --bind 127.0.0.1`で配信する。
+- **Unity版**(`unity/`): Unity 6000.3.11f1、URP(Universal 2D)、C#、WebGL。**JS版から意図的に変えた点**(すべて`docs/unity-port-plan.md` §5):
+  - HUD全体を2倍(`GameHud.HudScale`、ユーザー方針「少し大きすぎるくらい」)
+  - 音量スライダー(ミュートボタンの左)。そのため`audio.jspre`は`audio.js`に音量関数を足したもの
+  - 「射程内 N / 200」は満数を下回ったときだけ表示
+  - **揺動を止め(`WOBBLE_AX`/`WOBBLE_AY`=0)、`TAU_R`を3→8**(揺動があると「中央で約8秒で離す」で解けたため。ユーザーが試遊して採用)
+  - 背景の遠い星と重力レンズ(`StarfieldRenderer.cs`。危険度で歪み、離すと一度だけ逆に歪んで戻る。稀に流れ星)
+  - 起動時のUnityロゴ画面を外した
+  - **unityroomランキング**: ボード1=確定したスコア(降順)、ボード2=押してから爆発までの秒(昇順、小数点以下2桁)。ラウンドごとに自動送信。爆発画面にBANG TIMEと自己ベスト
 
-### Unity版の構成(方針と経緯は`docs/unity-port-plan.md`)
+### unityroomへ公開ビルドを出す手順(次の更新でもこのとおりにする)
+
+1. **HMACキーを置く**: `unity/Assets/Resources/Secrets/unityroom-hmac.txt`にキーの文字列だけを書く。**gitignore済みでコミットしない**。無いと送信しない(警告ログのみ)。Brainの確認用にダミーのキーを置いたら、確認後に必ず消す(残すとダミーで公開してしまう)。
+2. **ユーザーがエディターからビルドする**: ビルドプロファイル`Assets/Settings/Build Profiles/Web - Mobile - Release.asset`(Gzip、Decompression Fallbackオフ、Wasm 2023の3項目オン)。**Brainのバッチビルド(出力`WebGL-gzip`、ファイル名に大文字)は、アップロードの最後に「ビルドファイルをアップロードしてください」で弾かれた**(原因は未確定)。バッチで作るなら出力フォルダ名を小文字にする。
+3. **unityroomのWebGL設定**: Unityのバージョンで**6000.3を選んで保存してから**アップロードする(未選択だと`UnityLoader.js`・`*.unityweb`の古い枠が出る)。割り当てメモリは既定256MB(実測121.8MBで一定)。「ドット絵をはっきり表示する」はオフ。
+4. **出すファイル**: ビルドの`Build/`にある`.loader.js`・`.data.gz`・`.framework.js.gz`・`.wasm.gz`の4つ(Gzipで約23MB。縮小はユーザー判断で行わない)。
+5. 説明文にフォントのクレジット(BIZ UDゴシック、SIL OFL 1.1)。アイコンのGIFはユーザーが作る。
+
+### Unity版の構成
 
 | 場所 | 中身 |
 |---|---|
-| `unity/Assets/Scripts/Simulation/` | 物理とゲーム状態。**UnityEngineに依存しない純粋なC#**(asmdefで`noEngineReferences`)、倍精度。`BangSimulation`・`GameConfig`・`Mulberry32` |
-| `unity/Assets/Scripts/Game/` | コードから実行時に組み立てる(シーンは編集しない)。`GameBootstrap`(起動)・`GameManager`(自前アキュムレータのループ・入力・ハイスコア)・`LetterboxCamera`・`GameRenderer`・`GameHud`・`AudioMuteManager`・`WebAudioEvents` |
-| `unity/Assets/Plugins/WebGL/` | `audio.jspre`(**JS版`audio.js`のコピーに音量調節だけを足したもの**。差分は`docs/unity-port-plan.md` §5-5)・`audio-unlock.jspre`(押下イベント内で`init()`)・`BangsAudio.jslib`(C#→`AudioController`の中継) |
-| `unity/Assets/Resources/Fonts/` | BIZ UDゴシック 通常・太字(OFL、ライセンス文同梱) |
-| `unity/Assets/WebGLTemplates/FullWindow/` | キャンバスをウィンドウ全体に広げるテンプレート |
-| `unity/Assets/Editor/WebGLBuild.cs` | バッチビルド用 |
-| `unity/Assets/Tests/EditMode/` | JS版との数値一致テスト10件と基準データ(`Golden/`) |
-| `tools/sim-harness/golden.js` | 本物の`script.js`をNodeで固定シードで回し、基準データを作る |
-| `tools/web-shot/cdp-shot.mjs` / `cdp-audio-check.mjs` | ヘッドレスChromeで撮影 / 音の呼ばれ方を計測(JS版とUnity版を同じ操作で比べる) |
+| `unity/Assets/Scripts/Simulation/` | 物理とゲーム状態。**UnityEngineに依存しない純粋なC#**(asmdefで`noEngineReferences`)、倍精度。`BangSimulation`(`RoundSteps`/`LastBangSteps`/`BestBangSeconds`でビッグバン時間を固定ステップで数える)・`GameConfig`・`Mulberry32` |
+| `unity/Assets/Scripts/Game/` | コードから実行時に組み立てる(シーンは編集しない)。`GameBootstrap`・`GameManager`(ループ・入力・ハイスコアと自己ベストの保存・状態遷移でランキング送信)・`LetterboxCamera`・`GameRenderer`・`StarfieldRenderer`・`GameHud`・`AudioMuteManager`・`WebAudioEvents`・`UnityroomRanking` |
+| `unity/Assets/Plugins/WebGL/` | `audio.jspre`(`audio.js`+音量)・`audio-unlock.jspre`・`BangsAudio.jslib` |
+| `unity/Assets/Resources/Fonts/` / `Secrets/` | BIZ UDゴシック通常・太字(OFL同梱) / HMACキー(gitignore) |
+| `unity/Assets/Settings/Build Profiles/` | 公開に使ったビルドプロファイル |
+| `unity/Assets/Editor/WebGLBuild.cs` | バッチビルド用(`-webglCompression`はビルド後に元へ戻す。プロジェクト既定はGzip) |
+| `unity/Assets/Tests/EditMode/` | 数値一致テスト10件と基準データ(`Golden/`) |
+| `unity/Packages/manifest.json` | `com.unityroom.client`(v0.9.6、gitのタグで固定)を追加済み |
+| `tools/sim-harness/golden.js` | 本物の`script.js`を固定シードで回して基準データを作る。`GameConfig.cs`と`config.js`の差分は意図した3項目(揺動2つと`TAU_R`)だけを読み込み時に上書きし、それ以外の差があれば止まる |
+| `tools/sim-harness/bang-timing.js` | 「一定秒数で離す」と「危険度を見て離す」の平均点を、揺動・設定・操作ごとに比べる |
+| `tools/web-shot/` | `cdp-shot.mjs`(撮影。`HOLD_X/HOLD_Y`で押す位置、第7引数でHUD倍率)・`cdp-audio-check.mjs`(音・ミュート・音量スライダー)・`cdp-early-frames.mjs`(起動直後を0.5秒おきに撮る)・`serve-gzip.mjs`(Gzipビルドを正しいヘッダーで配信) |
 
-### よく使うコマンド(Unityエディタを閉じた状態で。開いているとバッチ実行はプロジェクトのロックで失敗する)
+### よく使うコマンド(Unityエディタを閉じた状態で。開いているとバッチ実行はロックで失敗する)
 
 ```
 unity test "<リポジトリ>\unity" --mode EditMode --output <xml>
 unity build "<リポジトリ>\unity" --target WebGL --execute-method WebGLBuild.Build -o "<リポジトリ>\unity\Build\WebGL" --args "-webglCompression Disabled" --no-tail
-python -m http.server 8765 --bind 127.0.0.1 --directory "<リポジトリ>\unity\Build\WebGL"   (ユーザーは http://127.0.0.1:8765/ を Ctrl+F5)
-node tools/sim-harness/golden.js                                       (JS版を変えたら基準データを作り直す)
-node tools/web-shot/cdp-shot.mjs <url> 1920 1080 <outDir> <name> [holdMs]
-node tools/web-shot/cdp-audio-check.mjs <url> <outDir> <name> [bangHoldMs]
+python -m http.server 8765 --bind 127.0.0.1 --directory "<リポジトリ>\unity\Build\WebGL"   (無圧縮ビルド。ユーザーは Ctrl+F5)
+node tools/web-shot/serve-gzip.mjs <Gzipビルドのフォルダ> 8767                            (Gzipビルドはこちら)
+node tools/sim-harness/golden.js                                       (JS版かGameConfig.csを変えたら作り直す)
+node tools/sim-harness/bang-timing.js --seeds 200 --variants "noWobble+TAU_R=8"
+node tools/web-shot/cdp-shot.mjs <url> 1920 1080 <outDir> <name> [holdMs] [hudScale=2]
+node tools/web-shot/cdp-audio-check.mjs <url> <outDir> <name> [bangHoldMs] [hudScale=2]
 ```
-`unity`は`C:\Users\ryoga\AppData\Local\Unity\bin\unity.exe`(CLI 1.0.0-beta.9)。ビルドは2分前後。
+`unity`は`C:\Users\ryoga\AppData\Local\Unity\bin\unity.exe`(CLI 1.0.0-beta.9)。ビルドは2分前後。**セッションが再開すると、バックグラウンドで動かしていた配信は止まっている**ので立ち上げ直す。
 
-### 実測値(JS版。Unity版も物理は同じ)
+### 実測値(Unity版の設定)
 
-- 盤面中央付近で普通に遊ぶと**約10秒**で発火。理想的に塊を追う操作で最速6秒台。
-- ウィンドウサイズを変えても最速タイムの幅は0.32秒。10〜144fpsのすべてで発火。3440×1440・165Hzでラウンドを通して165fps。
-- ユーザーの評価: 「なかなかビッグバンが起きないのもゲーム性として面白い」。
+- 中央付近で押し続けた発火は平均9.86秒・標準偏差1.04秒(200シード)。「一定秒数で離す」は理論上の最高点の72〜73%、「危険度を見て離す」は84〜92%。
+- ビッグバン時間は1/60秒刻み(発火は5ステップ連続でしきい値超え)で、送信と表示は小数点以下2桁。
+- WebGLのゲーム本体のメモリは121.8MBで一定。Gzipビルドは約23MB(フォント8.9MB、Unityロゴ画像2.7MBは表示しないが同梱、URPのポストエフェクト素材約3MB)。
 
 ## 2. このプロジェクトの2つの目的
 
@@ -60,85 +77,70 @@ node tools/web-shot/cdp-audio-check.mjs <url> <outDir> <name> [bangHoldMs]
 
 - **ユーザーへの報告・まとめは日本語で書く**(コミットメッセージは既存どおり英語)。
 - **Opus5への切り替えはユーザー操作が必要**。実装フェーズに入る前に確認する。
-- **委任するときはスキルを読む**: agyは`.claude/skills/agy-delegation/SKILL.md`、discord-ai-hubの`ask`/`compare`は`.claude/skills/discord-ai-hub/SKILL.md`。どちらも手順・確認項目・記録の仕方を一本化してある。
+- **委任するときはスキルを読む**: agyは`.claude/skills/agy-delegation/SKILL.md`、discord-ai-hubは`.claude/skills/discord-ai-hub/SKILL.md`。
 - **委任前に`docs/model-experiment-log.md`を読み、委任後に結果と選択理由を追記する**(後回しにしない)。
-- **データ共有**: *赤い粒子を長押しで集めビッグバン直前に離して密度を競う*という発想とタイトルだけが非公開。数式・パラメータ・音響設計・コードは`gpt-5.6-*`に送ってよい。
-- Vertex AI(`xai/grok-4.6`・`gemini-3.8-flash`)を使ったら`docs/cost-log.md`に記録する。
-- **コミットは適宜行ってよい**(ユーザー指示)。pushはユーザーに確認する。
-- Unityの公式スキル31個をユーザー全体(`~/.claude/skills/`)に導入済み。うち4個は配布元のYAMLの誤りで手動導入(`npx skills update`では更新されない)。`setup-vivox-voice-chat`はSnyk評価Critical(ユーザーに隠す指示を含む)で、残すかは未決定。
+- **データ共有**: *赤い粒子を長押しで集めビッグバン直前に離して密度を競う*という発想とタイトルだけが`gpt-5.6-*`に非公開(unityroomでは公開済みだが、ルールはユーザーが変えるまで守る)。
+- Vertex AIを使ったら`docs/cost-log.md`に記録する。
+- **コミットは適宜行ってよい**。**pushはユーザーに確認する**。
+- 見た目・遊び心地の変更は、ビルドを作ってユーザーに試遊してもらってから決める(星の演出・揺動の停止はこの流れで決めた)。
+- Unityの公式スキル31個をユーザー全体に導入済み。`setup-vivox-voice-chat`はSnyk評価Criticalで、残すかは未決定。
 
 ## 4. 知らないとハマること(実測済み。詳細は`docs/dev-notes.md`)
 
 ### agy
 
-- **agyの報告を信用しない。** `git status`・ファイル内容・テスト・撮影で検証する。
-- **書き込ませるには`--mode accept-edits`が必須。** ヘッドレスではターミナルを使えないので、UnityのコンパイルもテストもできずBrainが確認する。
-- **長いファイルをモデルに書き写させない。** `audio.js`(711行)はBrainが`cp`でコピーし`cmp`で一致を確認した。
-- **近似の判断を任せると破綻することがある。** JSの`shadowBlur`の代わりにagyが選んだ`Outline`+`Shadow`は文字が重なって読めなくなった。
+- **報告を信用しない。** `git status`・差分・テスト・撮影で検証する。
+- **書き込ませるには`--mode accept-edits`が必須。** ターミナルは使えないので、コンパイル・テスト・ビルドはBrainが行う。
+- **既存の長いメソッドへの追記では、ローカル変数名の重なり(CS0128)に気づけない**(音量スライダーで発生)。プロンプトに「追加する変数には用途の分かる名前を付ける」と書くと以後は起きていない。
+- **`Mathf.Lerp`は0〜1に丸める**ので、負の値を補間するときは`LerpUnclamped`を指定する。
+- **長いファイルを書き写させない。** **近似の判断を任せない**(`shadowBlur`の代わりの`Outline`+`Shadow`で文字が重なった)。
+- Brainの並行作業と触るファイルが重ならなければ、同時に進めても衝突しなかった(ランキング)。
 
-### Unity(JSの数値を正しく写しても崩れる約束事)
+### Unity
 
-- **子オブジェクトは親の拡大率を引き継ぐ**(光の円が4〜6倍になった)。
-- **9スライスの枠は`Canvas`の`referencePixelsPerUnit`(100)基準**(2倍テクスチャなら200)。
-- **実行時テクスチャの色は不透明度を掛けずに書く**(掛けると二重に効き、20%の枠が約4%になる)。
-- **Universal 2Dテンプレートの既定はLinear色空間**で、淡い半透明がCanvasより明るく出る → Gammaに変更済み。
-- **既定のWebテンプレートはキャンバス960×600固定** → FullWindowテンプレートに変更済み。
-- **太字ファイルの無いフォントはUnityが合成の太字にし、小さい漢字が潰れる** → 太字ファイルのあるBIZ UDゴシックに変更済み。
-- **`JsonUtility`は10進数のdoubleを1ulpずれて読む** → 基準データはビット列(16進)で渡す。
-- **`unity build`はWebGLを`--target`だけでは作れない**(`--execute-method`か`--profile`が要る)。
-- **Hubでの作成は選んだつもりと違うエディタ版になることがある**(6000.3.13f1で作られていた)→ 作成直後に`ProjectVersion.txt`を確認。
-- **WebGLでは`OnAudioFilterRead`もミキサーの効果も使えない** → 音はJS版をjslib経由で流用している。
-- パスのアポストロフィ(`Bang's-Edge`)は6000.3.11f1のWebGLビルドでは問題なかった。
+- **子オブジェクトは親の拡大率を引き継ぐ** / **9スライスは`referencePixelsPerUnit`(100)基準** / **実行時テクスチャの色は不透明度を掛けずに書く** / Universal 2Dの既定はLinear色空間(Gammaに変更済み) / 既定のWebテンプレートは960×600固定(FullWindowに変更済み) / 太字ファイルの無いフォントは合成の太字で潰れる / `JsonUtility`はdoubleを1ulpずれて読む。
+- **`unity build`はWebGLを`--target`だけでは作れない**(`--execute-method`か`--profile`)。
+- **WebGLでは`OnAudioFilterRead`もミキサーの効果も使えない**(音はJS版をjslibで流用)。
+- **unityroomの公式クライアントはシーンに置く前提**(非公開フィールド`HmacKey`、Awakeで検査)。シーンを編集しないので、非アクティブのGameObjectに追加→リフレクションでキー→有効化、としている。ライブラリはボードごとに最短6秒間隔で送り、応答が返らないと6秒おきに送信を始め直す(手元のサーバーで観測)。
+- **エディターからビルドすると、Input Systemが`ProjectSettings.asset`の`preloadedAssets`に`InputSystem_Actions.inputactions`を足す**(このゲームは使っていないが害は無い)。`GraphicsSettings`の`m_LightsUseLinearIntensity`も変わった(ライト未使用)。
+- **起動時のロゴ画面は`m_ShowUnitySplashScreen: 0`で消える**が、ロゴ画像はビルドに残る。消えたかは`cdp-early-frames.mjs`で確かめる。
 
 ### 検証
 
-- **静止した見た目と音の呼ばれ方はBrainが自分で確かめられる**(`tools/web-shot/`)。Chrome拡張は未接続のまま。**`--screenshot`と`--virtual-time-budget`だけではUnityの読み込みを待たず真っ黒になる**ので、DevToolsプロトコルで実時間待つ。SwiftShader描画なのでfps・滑らかさ・聴感は測れず、ユーザーに頼む。
-- **物理はNodeで本物の`script.js`を動かして検証できる**(`tools/sim-harness/golden.js`、リポジトリに保存済み)。`Math.random`の差し替えが効いたことを実行前にアサートしている。
-- **検証そのものを疑うこと。** 実際に踏んだもの: パラメータ上書きが効いていなかった / 測りたい変数以外を固定しない対照 / 理想化した操作モデル / 1回の失敗からの原因推定 / **ユーザーの「光の円そのものが大きい」を、自分の推測(色空間)で先に説明しようとして外した**。
-- **観測できない側の挙動を手元の見え方だけで断定しない。** 「観測した事実」と「推定」を分けて書く。
-- **Windows環境**: Git Bashの`/tmp`とWindows版Pythonの`/tmp`は別の場所。Pythonの標準出力はcp932。PowerShell 5.1はネイティブコマンドへの引数内のダブルクォートを崩すことがある。**Bashで`cd`すると以後の作業ディレクトリが変わる**ので絶対パスを使う。パス変数に`Program Files`を含むコマンドで`Remove-Item`がブロックされたことがある。
-
-### JS版の実装
-
-- 環境非依存にするには空間(論理盤面)と時間(固定ステップ)の両方を固定する。
-- `shadowBlur`は大きな図形やまとめたパスに使わない。
-- **`FIXED_DT`を1/120に上げてはいけない**(バランスが約10%変わる)。
+- **静止した見た目と音の呼ばれ方はBrainが確かめられる**(`tools/web-shot/`)。動き(星の戻り方・流れ星)・fps・聴感はユーザーに頼む。
+- **ゲームの性質は`bang-timing.js`で点数として測れる**。操作モデルは粗い近似なので、採用前にユーザーの試遊を挟む。
+- **検証そのものを疑う。** 今回踏んだもの: 照合できたキーが0件の比較(字下げのずれ)、止まっていた配信に対する確認(応答000で何も読み込まれていなかった)、jqの正規表現のエスケープ。**「何件照合したか」「応答コード」を毎回出す。**
+- **Windows環境**: **Bashで`cd`すると以後の作業ディレクトリが変わる**(今回も2回踏んだ)ので`git -C`や絶対パスを使う。PowerShell 5.1はネイティブコマンドへの引数内のダブルクォートを崩す。
 
 ## 5. 未解決・保留事項
 
-1. ~~**UIの微調整**~~ **完了(2026-09-11)**: HUD全体を`GameHud.HudScale`(2倍)で拡大(ユーザー方針「少し大きすぎるくらい」)。赤い光・💥・タイトルの字間は「行わなくて問題ない」(ユーザー判断)。**音量スライダーをUnity版にだけ追加**(ミュートボタンの左、`docs/unity-port-plan.md` §5-5)。「射程内 200 / 200 が変わらない」報告は仕様どおり(中央付近では満数、`docs/dev-notes.md`)だったので、Unity版は満数を下回ったときだけ表示するようにした(`docs/unity-port-plan.md` §5-7)。
-2. ~~**JS版の凍結を解くか**~~ **決定(2026-09-11)**: JS版は以前の遊びのまま残し、公開までUnity版を主にする。GitHubはunityroomに出すまで非公開(§1)。公開に戻すときにPagesでJS版を再公開するかは未決定。
-3. **ビッグバンの時刻が揺動の位相に張り付いている → Unity版は対策を採用(2026-09-11)**: ユーザーが両方を試遊し、Unity版は揺動なし+`TAU_R`=8で公開まで進める。JS版は以前のまま(`docs/unity-port-plan.md` §5-6)。ユーザーは「以前のランダム性にも別の面白さがあった」とも言っているので、将来、揺動ありを別の遊び方として出す余地がある。以下は判断時の記録: 揺動で測定円内の個数が約0.65秒周期で大きく上下し、発火が特定の山に揃う。現行は「中央に置いて約8秒で離す」で理論上の最高点の93〜94%が取れ、危険度表示を見る戦略(65〜69%)より強い=ストップウォッチで解ける。**候補: 揺動を止め(`WOBBLE_AX`/`WOBBLE_AY`=0)、`TAU_R`を3→8にしてテンポを戻す**(設定値のみの変更)。発火の平均9.8〜10.9秒で、一定秒数の戦略72〜73%・表示を見る戦略84〜92%に逆転。詳細は`docs/dev-notes.md`、計測は`node tools/sim-harness/bang-timing.js`。採用するならJS版の凍結との関係(基準データの作り直し)も決める。操作モデルは粗い近似なので、採用前にユーザーが遊んで体感を確かめる。
-4. **小さいウィンドウで文字と粒子が読めない**(論理盤面固定の副作用)。最小サイズの下限は未決定。
-5. **165Hz表示では動きが60Hzに量子化される**(固定ステップの副作用)。指摘は無し。
-6. **ゲームバランスは煮詰め途中**(`R_MAX_RATIO`・`F_CREEP`・揺動振幅)。易しくする方向の調整は確認してから。
-7. **`docs/game-concept.md`の「音」の節が古い**(現行の`audio.js`はgrok設計の7ノード構成)。未確定事項2つ(「一度離したら即終了」で良いか、ビッグバン演出の作り込み)も残る。
-8. **unityroom投稿(初版は公開済み。ランキング2つ=スコアとビッグバン最短時間を実装中、`docs/unity-port-plan.md` §5-9)**: 圧縮形式はGzip(`Eclipse-Diver`で実績)。**Gzipビルドを手元で確認済み**(2026-09-11): `unity build ... --args "-webglCompression Gzip"` を `unity/Build/WebGL-gzip` に出力し、`node tools/web-shot/serve-gzip.mjs unity/Build/WebGL-gzip 8767`(`.gz`に`Content-Encoding: gzip`を付けて配信。`python -m http.server`ではGzipビルドは動かない)で配信して、画面・音・ミュート・音量を確認した。出力は `loader.js` 27KB・`framework.js.gz` 96KB・`data.gz` 10.7MB・`wasm.gz` 12MB の計約23MB。内訳はフォント8.9MB、Unityロゴ画像2.7MB、URPのポストエフェクト素材約3MBなどで、縮小案(フォントを使う文字だけにする等)はあるが**ユーザー判断で行わない**(23MBなら問題ない)。**unityroomの投稿画面の指示は「Compression Format: Gzip、Decompression Fallbackのチェックを外す」**。Decompression Fallbackは元からオフ(`webGLDecompressionFallback: 0`。オンだとファイル名が`.unityweb`になる)。プロジェクトの既定の圧縮もBrotliからGzipに変えた(`webGLCompressionFormat: 1`。`WebGLBuild.Build`は`-webglCompression`の指定をビルド後に元へ戻すので、エディターから直接ビルドしてもGzipになるように)。**アップロード枠はWebGL設定で選んだUnityのバージョンで変わる**: バージョン未選択(または古い版)だと`UnityLoader.js`・`*.unityweb`の古い形式の枠が出る。6000.3を選べば`.loader.js`・`.data.gz`・`.framework.js.gz`・`.wasm.gz`の枠になるはず(ファイル名を付け替えても古い形式では動かない)。割り当てメモリは既定の256MBで足りる(実測でゲーム本体のメモリは121.8MBで一定)。「ドット絵をはっきり表示する」はオフ。**投稿の結果(2026-09-11)**: Brainのバッチビルド(`unity/Build/WebGL-gzip`、ファイル名`WebGL-gzip.*`)は、アップロードが最後まで進んだ後の待機中に「ビルドファイルをアップロードしてください」というエラーになった。原因は未確定(候補: ファイル名の大文字、一時的な失敗。中身は手動ビルドとほぼ同一)。**ユーザーがエディターからビルドプロファイル`Assets/Settings/Build Profiles/Web - Mobile - Release.asset`で手動ビルド(`unity/Build/web-self`、ファイル名は小文字)して投稿し、unityroom上で問題なく動いた。** 手動ビルドとの実質的な差は、プロファイルの既定で有効になったWasm 2023の3項目(`webGLWebAssemblyTable`・`webGLWebAssemblyBigInt`・`webWasm2023`が1。かなり古いブラウザでは起動しない可能性)と、`GraphicsSettings`の`m_LightsUseLinearIntensity`が0になったこと(ライトは未使用で影響なし)。手元でも`serve-gzip.mjs`で配信して動作を確認した。**次に更新するときは、このビルドプロファイルで手動ビルドするか、バッチビルドなら出力フォルダ名を小文字にする。****起動時のUnityロゴ画面は外した**(ユーザー判断、`m_ShowUnitySplashScreen: 0`。ゲームの枠内に出るのでunityroomでも表示されてしまうため。`Eclipse-Diver`でも出ていなかった。Unity 6はPersonalでも外せる)。記事によってアップロード形式の書き方が違う(Buildフォルダの4ファイル/中身をzip)ので投稿画面で確認する。画面サイズも投稿画面を見てから決める(既定960×540では粒子が1〜2pxになる)。フォントのクレジット(BIZ UDゴシック、SIL OFL 1.1、Reserved Font Nameなし)を説明文に書く。
-9. **細かい残り**: Unity Cloudのプロジェクト紐付け(`cloudProjectId`、無効化状態)を外すか / 不要パッケージ(Visual Scripting等)の整理 / MCPの未検証2点(推論トークンだけで出力上限を使い切る経路、326秒超の`compare`)。
-10. **追加の視覚演出: 背景の遠い星(ユーザー案、2026-09-11)** → **初版に入れることに決定し、実装済み(ユーザーが2回試遊して確認)**(`docs/unity-port-plan.md` §5-8、`StarfieldRenderer.cs`)。以下は案の段階の記録。
-    - 背景に、遠くの星が光っているような表現を置く。**実際に集める粒子と見比べられる(区別できる)表現**が望ましい。
-    - その星が、**粒子の密度とその中心に応じて歪む**ようにできたら面白そう(重力レンズのような見え方)。
-    - 着手時の注意(Brainのメモ): 物理(`BangSimulation`)と乱数列には触れない(数値一致テストが崩れるため、画面の揺れと同じく描画側で別の乱数を使う)。歪みの基準にする「密度」と「中心」を何にするか(計測円の密度か、粒子全体の重心か等)はユーザーと決める。
+1. **表示サイズと小さいウィンドウ**: unityroomの既定960×540では粒子が1〜2pxになる。投稿時に選んだサイズは記録していない。
+2. **揺動ありを別の遊び方として出すか**: ユーザーは「以前のランダム性にも別の面白さがあった」と言っている(JS版は揺動ありのまま)。
+3. **ゲームバランス**(`R_MAX_RATIO`・`F_CREEP`・`TAU_R`)は煮詰め途中。易しくする方向は確認してから。
+4. **仕様書の更新**: `docs/game-concept.md`の「音」の節が古い。Unity版だけの要素(HUD倍率・音量・星・ランキング)は仕様書に無く、`docs/unity-port-plan.md` §5にある。未確定事項2つ(「一度離したら即終了」で良いか、ビッグバン演出の作り込み)も残る。
+5. **GitHubの扱い**: リポジトリを公開に戻すか、PagesでJS版を再公開するか。Unity版の到達点にタグを打つか(既存は`v1`・`v1.1`)。
+6. **165Hz表示では動きが60Hzに量子化される**(固定ステップの副作用)。指摘は無し。
+7. **ビルドの縮小案**(フォントを使う文字だけにする8.9MB減など)はユーザー判断で見送り。容量で困ったら再検討。
+8. **細かい残り**: Unity Cloudの紐付け(`cloudProjectId`)を外すか / 不要パッケージ(Visual Scripting等)の整理 / vivoxスキルを残すか / MCPの未検証2点(推論トークンだけで出力上限を使い切る経路、326秒超の`compare`)。
 
 ## 6. Brain自身のコストについて
 
 - Opus5/XHighで、v1.1完成時点で5時間制限の約40%を消費(ユーザー観測)。2026-09-10後半からOpus5/High。
-- 2026-09-11(Unity移植)のセッションの消費率は未観測。長いセッションで、途中で数回セッションが再開されている。
+- 2026-09-11(移植〜unityroom公開)は途中で数回セッションが再開された長いセッションで、消費率は未観測。
 
 ## 7. 実験で分かったこと(次回の委任判断に使う)
 
 ### 委任
 
-- **仕様が数値まで確定していれば、軽量モデル(`gemini-3.8-flash-high`)で通る。** JS版で7回、Unity移植で4回(物理573行、ループ・描画約850行、HUD約900行、音の中継)、すべて1回目でコンパイルが通った。
-- **移植は「数値一致テストを先に用意」してから委任する。** 本物のJSを固定シードで回した基準データと突き合わせれば、委任先の報告を読まずに合否が決まる(物理はビット単位で一致を確認できた)。
-- **委任先の誤りの多くは「移植先の環境の約束事」で起きた**(親子の拡大率、9スライスの単位、不透明度の合成)。数値の転記は正確。プロンプトに約束事を書く。
-- **要約・整理のタスクでは条件や優先順位が落ちる。** 明示すると条件は残ったが、優先順位の強弱の変化と成否の語の丸めは残った。
-- **重いモデルの設計でも数式の整合性は必ず検算する。** 設計は高性能モデル・実装は軽量モデルという分離が成立する。
-- **数行〜十数行の修正は委任コスト(1回2〜4分)が見合わない**。Brainが直接直す。
-- **`gpt-5.6-sol`は数式の設計に強い。** 設計相談はまずGPT系統(無料枠)を試す価値がある。
-- **外部相談の回答が途中で切れていたら、切れた見出しの中身を取りに行く。**
+- **仕様が数値まで確定していれば、軽量モデル(`gemini-3.8-flash-high`)で通る。** JS版で7回、Unity版で10回。コンパイルエラーは音量スライダーの1回だけ(ローカル変数名の重なり)。
+- **移植は「数値一致テストを先に用意」してから委任する。** 報告を読まずに合否が決まる。
+- **委任先の誤りの多くは「移植先の環境の約束事」で起きた。** プロンプトに約束事を書く(`.claude/skills/agy-delegation/SKILL.md`)。
+- **見た目の数値はBrainの指定が外れることがある**(星が暗すぎた・レンズが小さすぎた)。撮影で確かめてから渡す。
+- **外部ライブラリを使わせるときは、Brainが先にソースを読んで使い方を決めてから渡す**(unityroomクライアントの初期化順)。
+- 数行〜十数行の修正はBrainが直接直す。重いモデルの設計でも数式は検算する。`gpt-5.6-sol`は数式の設計に強い。
 
 ### ユーザーとの協働
 
-- **欠陥の多くは、ユーザーの体感が先に捉えていた。** JS版では「毎回同じ」「画面サイズで体験が違う」「大きい画面でガクガク」。Unity版では「光の円が大きい」「文字がぼやけて読みにくい」「BIG BANGの文字が重なっている」。
-- **Brainの検証は、ユーザーの体感を確かめて定量化する役割のときに最も効いた。** Unity版では撮影ツールで原因を特定してから直した。ユーザーの言葉を自分の推測より優先する。
+- **欠陥の多くは、ユーザーの体感が先に捉えていた**(光の円が大きい、文字がぼやける、BIG BANGが重なる、射程内が変わらない)。
+- **Brainの計測は、ユーザーの体感を定量化して選択肢を示すときに最も効いた**(揺動の件は計測→候補の比較→試遊→採用)。ただし数値の結論と体感は一致しないことがある(「予想しやすくなったが固定された感じも強い」)。**決めるのはユーザー。**
+- ユーザーは物理的なもっともらしさを重視する(「ブラックホールは見え方だけを変える」)。演出を物理から外すときは、そう伝える。
