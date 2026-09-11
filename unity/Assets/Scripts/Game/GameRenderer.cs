@@ -43,6 +43,9 @@ namespace BangsEdge.Game
         // 盤面枠
         private LineRenderer _frameLine;
 
+        // 星空背景 (重力レンズ歪み演出)
+        private StarfieldRenderer _starfield;
+
         // LineRenderer 用の事前確保バッファ (GC Alloc ゼロ)
         private const int CIRCLE_VERTICES = 128;
         private float[] _unitCircleCos;
@@ -95,6 +98,10 @@ namespace BangsEdge.Game
 
             // 9. 盤面枠の構築 (画面振動で動かないよう _worldContainer の外に配置)
             BuildBoardFrame();
+
+            // 10. 星空背景の構築 (画面振動で動かないよう外側に配置)
+            _starfield = gameObject.AddComponent<StarfieldRenderer>();
+            _starfield.Initialize(_sharedSpriteMaterial);
         }
 
         private void BuildAttractField()
@@ -231,6 +238,9 @@ namespace BangsEdge.Game
         public void Render(BangSimulation sim, double nowMs)
         {
             if (sim == null) return;
+
+            // 星空背景の更新 (重力レンズ歪み)
+            _starfield.Render(sim, nowMs);
 
             // 1. 画面振動
             if (sim.ShakeMagnitude > 0.0)
