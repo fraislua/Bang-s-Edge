@@ -916,9 +916,16 @@ namespace BangsEdge.Game
             {
                 if (!_reachGroup.activeSelf) _reachGroup.SetActive(true);
 
-                // 1行目: 射程内個数
+                // 1行目: 射程内個数。盤面の中央付近では常に満数で動かず意味が伝わらないので、
+                // 満数を下回ったとき(端に寄ったとき)だけ出す(ユーザー判断、docs/unity-port-plan.md §5-7)
                 int reachable = sim.ReachableCount;
                 bool bangPossible = sim.BangPossible;
+
+                bool showReachCount = reachable < GameConfig.TOTAL_PARTICLES;
+                if (_reachCountText.gameObject.activeSelf != showReachCount)
+                {
+                    _reachCountText.gameObject.SetActive(showReachCount);
+                }
 
                 if (reachable != _cachedReachableCount)
                 {
