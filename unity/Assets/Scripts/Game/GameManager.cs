@@ -11,6 +11,7 @@ namespace BangsEdge.Game
     public sealed class GameManager : MonoBehaviour
     {
         private const string HIGH_SCORE_KEY = "bangs_edge_high_score";
+        private const string BEST_BANG_TIME_KEY = "bangs_edge_best_bang_time";
 
         private BangSimulation _sim;
         private GameRenderer _renderer;
@@ -25,6 +26,7 @@ namespace BangsEdge.Game
         private bool _isInitialized;
         private bool _isDraggingVolume;
         private float _lastSetVolume = -1f;
+        private GameState _observedState = GameState.Ready;
 
         /// <summary>
         /// 指数移動平均によるFPS推定値 (P5のHUD表示等で使用)。
@@ -53,6 +55,8 @@ namespace BangsEdge.Game
             // シミュレーション初期化 (WebAudioEvents 経由で WebGL 音響イベントを中継)
             _sim = new BangSimulation(rng, new WebAudioEvents());
             _sim.HighScore = _savedHighScore;
+            _sim.BestBangSeconds = PlayerPrefs.GetFloat(BEST_BANG_TIME_KEY, 0f);
+            UnityroomRanking.Initialize();
 
             _lastTimestamp = 0.0;
             _simNow = 0.0;
@@ -103,6 +107,8 @@ namespace BangsEdge.Game
                 _accumulator = 0.0;
                 _simNow = timestamp;
             }
+
+            HandleRoundTransitions();
 
             // 3. 描画更新
             _renderer.Render(_sim, timestamp);
@@ -182,6 +188,7 @@ namespace BangsEdge.Game
                 {
                     _sim.ConfirmRound();
                     CheckSaveHighScore();
+                    HandleRoundTransitions();
                 }
             }
         }
@@ -196,6 +203,7 @@ namespace BangsEdge.Game
                 {
                     _sim.ConfirmRound();
                     CheckSaveHighScore();
+                    HandleRoundTransitions();
                 }
             }
         }
@@ -207,6 +215,31 @@ namespace BangsEdge.Game
                 _savedHighScore = _sim.HighScore;
                 PlayerPrefs.SetInt(HIGH_SCORE_KEY, _savedHighScore);
                 PlayerPrefs.Save();
+            }
+        }
+
+        private void HandleRoundTransitions()
+        {
+            if (_sim == null) return;
+
+            GameState currentState = _sim.State;
+            if (currentState != _observedState)
+            {
+                if (_observedState == GameState.Attracting && currentState == GameState.Resolved)
+                {
+                    UnityroomRanking.SendScore(_sim.FinalScore);
+                }
+                else if (_observedState == GameState.Attracting && currentState == GameState.Bang)
+                {
+                    UnityroomRanking.SendBangTime(_sim.LastBangSeconds);
+                    if (_sim.LastBangWasBest)
+                    {
+                        PlayerPrefs.SetFloat(BEST_BANG_TIME_KEY, (float)_sim.BestBangSeconds);
+                        PlayerPrefs.Save();
+                    }
+                }
+
+                _observedState = currentState;
             }
         }
     }

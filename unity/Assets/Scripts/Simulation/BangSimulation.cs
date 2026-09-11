@@ -80,6 +80,15 @@ namespace BangsEdge.Simulation
         public int FinalScore { get; private set; }
         public int HighScore { get; set; }
 
+        // ビッグバンまでの時間 (Unity版のランキング用。JS版には無い)
+        // 押してから発火までを固定ステップの数で数えるので、fps やタブの一時停止に左右されない
+        public int RoundSteps { get; private set; }
+        public int LastBangSteps { get; private set; }
+        public double LastBangSeconds => LastBangSteps * GameConfig.FIXED_DT;
+        // 自己ベスト (最短)。0 以下は記録なし。HighScore と同じく GameManager が保存値を入れる
+        public double BestBangSeconds { get; set; }
+        public bool LastBangWasBest { get; private set; }
+
         // 猶予カウンター・危険度段階
         public int GraceCounter { get; private set; }
         public DangerStage Stage { get; private set; }
@@ -200,6 +209,9 @@ namespace BangsEdge.Simulation
             State = GameState.Attracting;
             IsPressing = true;
             PressStartTime = nowMs;
+            RoundSteps = 0;
+            LastBangSteps = 0;
+            LastBangWasBest = false;
             CurrentDensity = 0.0;
             CurrentDangerRatio = 0.0;
             CurrentScore = 0;
@@ -254,6 +266,12 @@ namespace BangsEdge.Simulation
             IsPressing = false;
             CurrentScore = 0;
             FinalScore = 0; // 仕様: そのラウンドのスコアは0
+            LastBangSteps = RoundSteps;
+            LastBangWasBest = BestBangSeconds <= 0.0 || LastBangSeconds < BestBangSeconds;
+            if (LastBangWasBest)
+            {
+                BestBangSeconds = LastBangSeconds;
+            }
             GraceCounter = 0;
             FlashOpacity = 0.95;
             ShakeMagnitude = 22.0;
@@ -298,6 +316,7 @@ namespace BangsEdge.Simulation
 
             if (State == GameState.Attracting)
             {
+                RoundSteps++;
                 double t = Math.Max(0.0, (nowMs - PressStartTime) / 1000.0);
 
                 // 指数飽和曲線による集積半径 r(t) と引力 F(t) の計算 (引力に F_CREEP を加算)

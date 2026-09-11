@@ -12,6 +12,10 @@
 /[Uu]ser[Ss]ettings/
 *.log
 
+# unityroom HMAC key (Assets/Resources/Secrets/unityroom-hmac.txt). Never commit it.
+/[Aa]ssets/[Rr]esources/[Ss]ecrets/
+/[Aa]ssets/[Rr]esources/[Ss]ecrets.meta
+
 # By default unity supports Blender asset imports, *.blend1 blender files do not need to be commited to version control.
 *.blend1
 *.blend1.meta

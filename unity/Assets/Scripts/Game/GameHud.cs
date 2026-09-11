@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using UnityEngine;
 using UnityEngine.UI;
 using BangsEdge.Simulation;
@@ -87,6 +88,8 @@ namespace BangsEdge.Game
         private Text _resolvedScoreText;
         private Text _resolvedNewHighText;
         private GameObject _bangGroup;
+        private Text _bangTimeText;
+        private Text _bangNewBestText;
 
         // ミュートボタン
         private Image _muteBtnImage;
@@ -704,7 +707,10 @@ namespace BangsEdge.Game
             CreateText(_bangGroup.transform, "Title", "BIG BANG DETECTED!", Px(32), FontStyle.Bold, new Color(1f, 34f / 255f, 0f, 1f), TextAnchor.LowerCenter, FromCenterX(960f), FromCenterY(520f));
 
             CreateText(_bangGroup.transform, "Fail", "ROUND FAILED — SCORE: 0", Px(18), FontStyle.Bold, new Color(1f, 163f / 255f, 158f / 255f, 1f), TextAnchor.LowerCenter, FromCenterX(960f), FromCenterY(560f));
-            CreateText(_bangGroup.transform, "Sub", "CLICK TO RETRY", Px(14), FontStyle.Normal, new Color(148f / 255f, 163f / 255f, 184f / 255f, 1f), TextAnchor.LowerCenter, FromCenterX(960f), FromCenterY(595f));
+            _bangTimeText = CreateText(_bangGroup.transform, "BangTime", "BANG TIME: 0.00s", Px(14), FontStyle.Bold, new Color(226f / 255f, 232f / 255f, 240f / 255f, 1f), TextAnchor.LowerCenter, FromCenterX(960f), FromCenterY(585f));
+            _bangNewBestText = CreateText(_bangGroup.transform, "BangNewBest", "★ NEW BEST TIME! ★", Px(14), FontStyle.Bold, new Color(1f, 215f / 255f, 0f, 1f), TextAnchor.LowerCenter, FromCenterX(960f), FromCenterY(607f));
+            _bangNewBestText.gameObject.SetActive(false);
+            CreateText(_bangGroup.transform, "Sub", "CLICK TO RETRY", Px(14), FontStyle.Normal, new Color(148f / 255f, 163f / 255f, 184f / 255f, 1f), TextAnchor.LowerCenter, FromCenterX(960f), FromCenterY(632f));
 
             _readyGroup.SetActive(true);
             _resolvedGroup.SetActive(false);
@@ -1012,6 +1018,22 @@ namespace BangsEdge.Game
                 _readyGroup.SetActive(state == GameState.Ready);
                 _resolvedGroup.SetActive(state == GameState.Resolved);
                 _bangGroup.SetActive(state == GameState.Bang);
+
+                if (state == GameState.Bang)
+                {
+                    string lastTimeStr = sim.LastBangSeconds.ToString("F2", CultureInfo.InvariantCulture);
+                    if (sim.BestBangSeconds > 0.0)
+                    {
+                        string bestTimeStr = sim.BestBangSeconds.ToString("F2", CultureInfo.InvariantCulture);
+                        _bangTimeText.text = $"BANG TIME: {lastTimeStr}s  (BEST: {bestTimeStr}s)";
+                    }
+                    else
+                    {
+                        _bangTimeText.text = $"BANG TIME: {lastTimeStr}s";
+                    }
+
+                    _bangNewBestText.gameObject.SetActive(sim.LastBangWasBest);
+                }
             }
 
             if (state == GameState.Resolved)

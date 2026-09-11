@@ -263,6 +263,9 @@ namespace BangsEdge.Simulation.Tests
                 {
                     if (sim.State != GameState.Bang) return true;
                     csBangStep = step;
+                    // The ranking's bang time counts fixed steps from the press, so it must equal the step that fired.
+                    Assert.AreEqual(step, sim.LastBangSteps, $"seed={run.seed} LastBangSteps");
+                    Assert.IsTrue(sim.LastBangWasBest, $"seed={run.seed} first bang of a fresh simulation is a best time");
                     return false;
                 });
                 if (csBangStep == run.bangStep) same++;
