@@ -29,7 +29,10 @@
 - 決定と理由は`docs/unity-port-plan.md` §5-10(指の少し上に集める・横向き前提・実機はAndroidのChrome)。
 - **公開中の版はタッチでは遊べない**(長押ししてもラウンドが始まらない。ヘッドレスChromeのタッチ再現で確認、`docs/dev-notes.md`)。
 - 入れたもの: 入力を`Pointer.current`に / タッチのときだけ引き寄せる点を指の60 CSS px上へ(`GameManager.TOUCH_CURSOR_OFFSET_CSS_PX`、試遊で調整) / ミュートとスライダーの当たり判定を上下に44 CSS pxまで拡大 / 案内文をTOUCH・TAPに切り替え / 縦向きは全画面の案内(`OrientationNotice`) / `touch-gestures.jspre`(長押しの文字選択・メニュー、スクロール、タップ後の疑似マウスを抑止) / `audio-unlock.jspre`(指を離したときにも音を開始) / `BangsDisplay.jslib`(キャンバスのCSS倍率とcoarse pointer)。
-- **ヘッドレスChromeのタッチ再現では全項目が通った**(`node tools/web-shot/cdp-touch-check.mjs <url> <outDir> <name> [width] [height] [dpr]`)。**次はAndroidのChrome実機での確認**: ずらす量、音、長押しで何も出ないか、fps、unityroomのページ内での表示。PCの配信をLANに出す(`--bind 0.0.0.0`、PCは`192.168.0.53`)とファイアウォールの確認が出ることがあるので、ユーザーに確かめてから。確認できたら、ユーザーがビルドプロファイルでビルドして投稿する。
+- **ヘッドレスChromeのタッチ再現**(`node tools/web-shot/cdp-touch-check.mjs <url> <outDir> <name> [width] [height] [dpr]`)と、**AndroidのChrome実機**(ユーザーの古めの端末。iPhoneは無いのでiOSは確認できない)で確認済み: 読み込み・TOUCH/TAPの文言・ずらす量(60 CSS pxで問題なし)・長押しで文字選択やスクロールが出ない・音(1回目は離すまで鳴らず、2回目から鳴る)・ボタン・縦向きの案内と復帰。
+- **実機でアドレスバーに画面の下(fps)が隠れた** → テンプレートのキャンバスの高さ`100vh`を`100%`+`100dvh`に直して解消(`docs/dev-notes.md`)。**これは手元の確認用ページだけの修正で、unityroomは自前のページを使う。**
+- 実機への配信は`python -m http.server 8770 --bind 0.0.0.0 --directory <ビルド>`で、スマホから`http://192.168.0.53:8770/`(PCの有線LAN。Pythonの受信許可はプライベート・パブリック両方に登録済み)。
+- **次: ユーザーがビルドプロファイルでビルドしてunityroomへ投稿し、unityroomのページ内(アドレスバー、ゲーム画面の大きさ)で遊べるかを見る。** 表示に問題があれば、ゲーム内の全画面ボタン(AndroidのChromeならボタンを押したときに全画面にできる)などを検討する。
 
 ### unityroomへ公開ビルドを出す手順(次の更新でもこのとおりにする)
 

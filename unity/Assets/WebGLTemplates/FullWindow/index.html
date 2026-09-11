@@ -6,9 +6,12 @@
     <title>{{{ PRODUCT_NAME }}}</title>
     <style>
       /* The canvas always fills the browser window, like the web version.
-         The game letterboxes its 1920x1080 board inside it (LetterboxCamera). */
+         The game letterboxes its 1920x1080 board inside it (LetterboxCamera).
+         Not 100vh: on phones that is the height with the address bar hidden, so the bottom of the
+         game sat under the bar. 100% follows the window with the bar shown; 100dvh, where supported,
+         also follows the bar as it slides in and out. */
       html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
-      #unity-canvas { display: block; width: 100vw; height: 100vh; background: #000; outline: none; }
+      #unity-canvas { display: block; width: 100%; height: 100%; height: 100dvh; background: #000; outline: none; }
     </style>
   </head>
   <body>
