@@ -1,6 +1,6 @@
 # CLAUDE.md — Bang's-Edge
 
-マウスのみで遊ぶゲーム。JS版をGitHub Pagesで公開中で、**2026-09-11からUnity(WebGL)へ移植中**(`unity/`)。本プロジェクトは同時に2つの実験を兼ねる: (1) discord-ai-hub MCP統合構想(`docs/concept-ai-hub-integration.md`)の実地検証、(2) **Claude Codeからどれだけタスクを分散させられるかの実験**。
+マウスのみで遊ぶゲーム。JS版をGitHub Pagesで公開していたが、**2026-09-11からUnity(WebGL)へ移植中**(`unity/`)。**unityroomに出すまでリポジトリは非公開**(2026-09-11にユーザー判断で切り替え。無料プランのためPagesは停止中)。本プロジェクトは同時に2つの実験を兼ねる: (1) discord-ai-hub MCP統合構想(`docs/concept-ai-hub-integration.md`)の実地検証、(2) **Claude Codeからどれだけタスクを分散させられるかの実験**。
 
 ## Brainとしての役割(2026-09-10方針)
 
@@ -50,6 +50,6 @@ agy --model <model> --mode accept-edits --add-dir "<このリポジトリの絶�
 ## 技術スタック(2026-09-11にUnityへの移植を開始)
 
 - **移植先(`unity/`)**: Unity 6000.3.11f1・URP(Universal 2D)・C#。ターゲットはWebGL。移植方針・作業分割・検証方法は`docs/unity-port-plan.md`。ビルド手順は`docs/dev-notes.md`。
-- **JS版(リポジトリ直下)**: 素のHTML/CSS/JS(Canvas API)、ビルド無し。GitHub Pagesで公開中の現行版で、**移植の挙動の基準**。
+- **JS版(リポジトリ直下)**: 素のHTML/CSS/JS(Canvas API)、ビルド無し。移植前の現行版(Pagesはリポジトリの非公開化で停止中。確認はローカルで配信する)で、**移植の挙動の基準**。
 - 仕様の正本は`docs/game-concept.md`の「実装仕様」(JS版・Unity版共通)。
 - **agyはターミナルを使えないのでUnityのコンパイル・テスト・ビルドはできない。** 委任したC#は、Brainが`unity build`/`unity test`で確認する。

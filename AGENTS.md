@@ -10,7 +10,7 @@
 
 - ジャンル: マウスのみで遊ぶゲーム。
 - **2026-09-11からUnityへ移植中。** 移植先は`unity/`(Unity 6000.3.11f1、URP(Universal 2D)、C#、ターゲットはWebGL)。
-- **JS版**(リポジトリ直下の`index.html`/`style.css`/`config.js`/`script.js`/`audio.js`、素のHTML/CSS/JS・Canvas API)はGitHub Pagesで公開中の現行版で、**移植の挙動の基準**。依頼が無い限り変更しない。
+- **JS版**(リポジトリ直下の`index.html`/`style.css`/`config.js`/`script.js`/`audio.js`、素のHTML/CSS/JS・Canvas API)は移植前の現行版(リポジトリは非公開で、GitHub Pagesは停止中)で、**移植の挙動の基準**。依頼が無い限り変更しない。
 - 仕様の正本: `docs/game-concept.md`(特に「実装仕様」の数式・パラメータ)。移植方針: `docs/unity-port-plan.md`。
 
 ## 文書体系
@@ -26,7 +26,7 @@
 1. `docs/game-concept.md`との整合性(操作方法・スコアリング・ラウンド構造)。**移植では、JS版と同じ数式・定数・更新の順序になっているか**
 2. コード品質(不要な複雑化・デッドコード・命名の明確さ)
 3. パフォーマンス(描画、粒子数増加時のフレームレート低下の可能性)
-4. 動作環境: Unity版はWebGLビルドで動くこと(WebGLで使えない機能に依存しない)。JS版はGitHub Pages上の静的サイトとして動くこと
+4. 動作環境: Unity版はWebGLビルドで動くこと(WebGLで使えない機能に依存しない)。JS版はビルド無しの静的サイトとして動くこと(GitHub Pagesは非公開化で停止中だが、再公開できる状態を保つ)
 
 ## Unity版の作業上の注意
 

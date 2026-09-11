@@ -1,6 +1,6 @@
 # Bang's-Edge
 
-マウスのみで遊ぶブラウザゲーム。詳細は `docs/game-concept.md` を参照。GitHub Pagesで公開予定。
+マウスのみで遊ぶブラウザゲーム。詳細は `docs/game-concept.md` を参照。Unity(WebGL)版をunityroomで公開予定。
 
 ## このリポジトリの位置づけ
 
