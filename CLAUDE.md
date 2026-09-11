@@ -35,11 +35,15 @@
 
 ## agyへの依頼方法(実装・監査共通)
 
+**委任するときは`.claude/skills/agy-delegation/SKILL.md`を読む。** 委任するかの判断・プロンプトの書き方・呼び出し・検証・記録の手順をまとめてある。スキルとして自動で読み込まれなかった場合も直接読む。
+
 常設のカスタムエージェント(`.agents/agents/...`)は使わない。以下の形で都度呼び出す(`--add-dir`を付けるとそのディレクトリの`AGENTS.md`が自動で読み込まれ、基本方針・品質基準が反映される)。プロンプト冒頭に`[実装]`/`[監査]`で役割を明示する:
 
 ```
-agy --model <model> --add-dir "<このリポジトリの絶対パス>" -p "[実装|監査] <対象の指定>"
+agy --model <model> --mode accept-edits --add-dir "<このリポジトリの絶対パス>" -p "[実装|監査] <対象の指定>"
 ```
+
+ファイルを書かせない呼び出し(監査・提案のみ)では`--mode accept-edits`を付けない。
 
 モデル・effortは`docs/model-experiment-log.md`の実績を見て都度選ぶ。Vertex AI経由のモデルを使った場合は`docs/cost-log.md`にも記録する。
 
