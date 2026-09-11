@@ -15,6 +15,7 @@ namespace BangsEdge.Game
         private BangSimulation _sim;
         private GameRenderer _renderer;
         private LetterboxCamera _letterbox;
+        private GameHud _hud;
 
         private double _lastTimestamp;
         private double _simNow;
@@ -33,10 +34,11 @@ namespace BangsEdge.Game
         /// </summary>
         public BangSimulation Simulation => _sim;
 
-        public void Initialize(GameRenderer renderer, LetterboxCamera letterbox)
+        public void Initialize(GameRenderer renderer, LetterboxCamera letterbox, GameHud hud)
         {
             _renderer = renderer ?? throw new ArgumentNullException(nameof(renderer));
             _letterbox = letterbox ?? throw new ArgumentNullException(nameof(letterbox));
+            _hud = hud ?? throw new ArgumentNullException(nameof(hud));
 
             // ハイスコア読み込み (PlayerPrefs)
             _savedHighScore = PlayerPrefs.GetInt(HIGH_SCORE_KEY, 0);
@@ -102,6 +104,7 @@ namespace BangsEdge.Game
 
             // 3. 描画更新
             _renderer.Render(_sim, timestamp);
+            _hud.Render(_sim, timestamp, _fpsEstimate);
         }
 
         private void ProcessInput()
@@ -133,6 +136,10 @@ namespace BangsEdge.Game
                     // JS版では performance.now() (実時間ミリ秒) を渡す
                     double realNowMs = Time.realtimeSinceStartupAsDouble * 1000.0;
                     _sim.StartRound(realNowMs);
+                }
+                else
+                {
+                    AudioMuteManager.ToggleMute();
                 }
             }
 

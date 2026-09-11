@@ -28,7 +28,7 @@ JS版(リポジトリ直下)を、`unity/`のUnity 6000.3.11f1・URP(Universal 2
 | ポインター入力(`pointerdown`/`move`/`up`/`cancel`) | Input System(プロジェクトは新Input Systemのみ: `activeInputHandler: 1`)の`Mouse.current` | `pointercancel`相当は、フォーカス喪失(`OnApplicationFocus(false)`)で`confirmRound`する |
 | `localStorage` のハイスコア | `PlayerPrefs`(キーは同じ`bangs_edge_high_score`) | WebGLではIndexedDBに保存される |
 | 描画: 粒子3パス+発光層、集積円(最大半径1432px)、点線の測定円、十字、フラッシュ、画面振動、盤面の枠 | 粒子はコードで生成した円テクスチャのスプライト、円は`LineRenderer` | 色・半径・透明度はJS版の値をそのまま使う。**画面振動の乱数はシミュレーションと別の乱数にする**(§3) |
-| HUD(密度バー・段階表示・射程内の個数と警告・fps・SCORE/HIGH・待機/確定/ビッグバン画面) | uGUIをコードで組み立て、**日本語フォントを同梱**(§5-2) | 候補はNoto Sans JP(OFL)。ライセンス文を一緒に置く。**💥は日本語フォントに含まれない**ので、P5で別の表現を決める(★は含まれる) |
+| HUD(密度バー・段階表示・射程内の個数と警告・fps・SCORE/HIGH・待機/確定/ビッグバン画面) | uGUIをコードで組み立て、**日本語フォントを同梱**(§5-2) | **BIZ UDゴシック**の通常と太字(`unity/Assets/Resources/Fonts/BIZUDGothic-Regular.ttf`/`-Bold.ttf`、各4.6MB、google/fonts)を同梱。ライセンス(SIL OFL 1.1)は同じフォルダの`BIZUDGothic-OFL.txt`で、Resources内にあるのでビルドにも含まれる。太字は太字ファイルで描く(当初のNoto Sans JPは太字ファイルが無く、合成の太字で漢字が潰れたので差し替えた。等幅でJS版の見た目にも近い)。**💥はフォントに無いので付けない**(「BIG BANG DETECTED!」のみ。JSの赤いぼかしはuGUIの縁取りで近づける)。★と—は含まれる。unityroomなどで公開するときはクレジットにフォント名とライセンスを書く |
 | ミュートボタン(右上28px、押してもラウンドを始めない) | 同じ位置・同じ判定 | |
 | `audio.js`(Web Audioの合成音: ドローン7ノード・警告パルス・爆発3層・確定和音) | **`audio.js`をjslibプラグインとして流用**(§5-1) | C#からは`[DllImport("__Internal")]`で呼ぶ。エディタ上では何もしない代替実装に切り替える(`#if UNITY_WEBGL && !UNITY_EDITOR`) |
 
@@ -50,6 +50,15 @@ JS版(リポジトリ直下)を、`unity/`のUnity 6000.3.11f1・URP(Universal 2
 P1とP3〜P5は、P2の一致テストが通ってから順に進める。物理がずれたまま描画を載せると、見た目の違和感の原因が切り分けられなくなる。
 
 **進捗(2026-09-11)**: P0〜P2完了。EditModeテスト10件が通過(乱数と定数はビット一致、短期は1e-9以内で一致、200シードの発火時刻の分布も一致)。**P3とP4は1回の委任にまとめた**(描画が無いとユーザーが確認できず、分けても検証の手段が増えないため)。P3+P4はコンパイル通過・コード照合済み(測定円の重なり順を1点修正)。見た目・操作感はWebGLビルドでユーザー確認待ち。
+
+### P6(音)の設計メモ
+
+`audio.js`は即時関数で`window.AudioController`(`init`/`resume`/`updateWarning`/`playBigBang`/`playResolve`/`toggleMute`/`isMuted`/`startDrone`/`stopDrone`/`updateDrone`)を公開する作り。これをそのまま使う。
+
+- **`audio.js`は`.jspre`としてビルドに含める**(Unityのフレームワークの前に連結され、`window.AudioController`がそのまま定義される)。中身はJS版の`audio.js`の写し。JS版は凍結中なので、写しが食い違う心配は移植中は無い。
+- **C#からの呼び出しは薄い`.jslib`**(`AudioController`の各メソッドを呼ぶだけの関数)と、`[DllImport("__Internal")]`で`IAudioEvents`を実装するクラス。エディタとWebGL以外では何もしない実装に切り替える。
+- **自動再生ポリシー**: ブラウザは、ユーザー操作のイベント処理の中でないと`AudioContext`を開始させないことがある。Unityの入力は次のフレームで処理されるので、イベント処理の外になる。**`.jspre`側で`document`の`pointerdown`を直接受け、その場で`AudioController.init()`を呼ぶ**(JS版も押下のたびに`init()`を呼んでいる)。
+- **ミュートの状態が二重になる**: P5のミュート状態はUnityの`PlayerPrefs`(WebGLではIndexedDB)に保存するが、`audio.js`は`localStorage`の同じキー`bangs_edge_muted`を読む。WebGLでは`AudioController.isMuted()`を正とし、切り替えは`toggleMute()`を呼んで結果を反映する。
 
 ## 3. 検証方法
 

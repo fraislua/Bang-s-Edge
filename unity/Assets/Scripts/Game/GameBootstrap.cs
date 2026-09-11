@@ -40,18 +40,22 @@ namespace BangsEdge.Game
             var letterbox = boardCamera.gameObject.AddComponent<LetterboxCamera>();
             letterbox.Initialize(boardCamera);
 
-            // 4. ゲームマネージャーおよびレンダラーの生成と初期化
+            // 4. ゲームマネージャー、レンダラー、およびHUDの生成と初期化
             var managerGo = new GameObject("GameManager");
             var renderer = managerGo.AddComponent<GameRenderer>();
+            var hudGo = new GameObject("GameHud");
+            var hud = hudGo.AddComponent<GameHud>();
             var manager = managerGo.AddComponent<GameManager>();
 
+            hud.Initialize(boardCamera);
             renderer.Initialize();
-            manager.Initialize(renderer, letterbox);
+            manager.Initialize(renderer, letterbox, hud);
 
             // シーン再読込時にも保持
             Object.DontDestroyOnLoad(boardCamera.gameObject);
             Object.DontDestroyOnLoad(blackBarsGo);
             Object.DontDestroyOnLoad(managerGo);
+            Object.DontDestroyOnLoad(hudGo);
         }
     }
 }
