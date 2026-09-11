@@ -159,7 +159,11 @@ namespace BangsEdge.Game
                 glowSr.enabled = false;
 
                 // メイン粒子 (射程外 / 通常 / 測定円内: sortingOrder = 4, 6, 7)
-                var mainSr = pGo.AddComponent<SpriteRenderer>();
+                // 発光層と兄弟にする。pGo 自体に置いて拡大すると、子の発光層がその拡大率を引き継いで
+                // 半径が数倍になる(実際に CRITICAL で 6.7px のはずが約29px になっていた)
+                var coreGo = new GameObject("Core");
+                coreGo.transform.SetParent(pGo.transform, false);
+                var mainSr = coreGo.AddComponent<SpriteRenderer>();
                 mainSr.sprite = _circleSprite;
                 mainSr.sharedMaterial = _sharedSpriteMaterial;
                 mainSr.sortingOrder = 6;
