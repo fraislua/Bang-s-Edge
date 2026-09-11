@@ -14,7 +14,7 @@
 
 - **JS版**(リポジトリ直下): 公開中 → https://fraislua.github.io/Bang-s-Edge/ 。**移植の基準として凍結中**(`docs/unity-port-plan.md` §0)。移植が終わったので、凍結を解くかはユーザー判断待ち。
 - **Unity版**(`unity/`): Unity 6000.3.11f1、URP(Universal 2D)、C#、WebGL。
-- **未push**: `f259bf1`以降のすべてのコミット(このメモの更新を含む。`git log --oneline origin/main..HEAD`で確認)。pushすると`main`がPagesに反映される(JS版のファイルは変わらず、`unity/`・`tools/`・`docs/`・`.claude/`が増えるだけ)。
+- **push済み(2026-09-11)**: Unity移植・HUDの拡大・音量スライダーまで、ユーザーの指示でpushした。以後の未pushは`git log --oneline origin/main..HEAD`で確認する。`main`はそのままPagesに反映される(このpushでJS版のファイルは変わらず、`unity/`・`tools/`・`docs/`・`.claude/`が増えただけ)。
 - **pushの反映確認**: 公開ファイルを`curl`で取得し、改行コードを除いてローカルと比較する(Pagesは改行がLF、作業ツリーはCRLFになることがある)。
 - タグは`v1`(音なし初版)と`v1.1`(音の完成版)のみ。**Unity版の到達点にタグを打つ候補。**
 
