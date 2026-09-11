@@ -12,7 +12,7 @@
 
 **Unity版をunityroomで公開した(2026-09-11)。ランキング2つ(スコア、ビッグバン最短時間)も動いている(ユーザーが反映を確認)。**
 
-- **GitHub**: `fraislua/Bang-s-Edge`は**非公開**(ユーザー判断)。無料プランなのでGitHub Pagesは止まっている(https://fraislua.github.io/Bang-s-Edge/ は404)。公開に戻すか、JS版をPagesで再公開するかは未決定。**すべてpush済み**(未pushは`git log --oneline origin/main..HEAD`で確認)。
+- **GitHub**: `fraislua/Bang-s-Edge`は2026-09-11にいったん非公開にしたが、unityroomへの公開とスマホ対応が済んだので**公開に戻すとユーザーが決めた**(切り替えはユーザーが行う。公開前の点検結果は`docs/dev-notes.md`)。GitHub Pagesの設定は残っていない(`has_pages: false`)ので、公開してもJS版は自動では出ない。PagesでJS版を再公開するかは未決定。**すべてpush済み**(未pushは`git log --oneline origin/main..HEAD`で確認)。
 - **未追跡の`gif/`**: ユーザーがアイコン用に作った素材。コミットするかは聞いていない(触らない)。
 - **JS版**(リポジトリ直下): 以前の遊び(揺動あり)のまま残す(ユーザー判断)。**物理のロジックの基準**で、`golden.js`はこれを動かしてUnity版の基準データを作る。確認するときは`python -m http.server <port> --bind 127.0.0.1`で配信する。
 - **Unity版**(`unity/`): Unity 6000.3.11f1、URP(Universal 2D)、C#、WebGL。**JS版から意図的に変えた点**(すべて`docs/unity-port-plan.md` §5):
@@ -31,7 +31,7 @@
 - 入れたもの: 入力を`Pointer.current`に / タッチのときだけ引き寄せる点を指の60 CSS px上へ(`GameManager.TOUCH_CURSOR_OFFSET_CSS_PX`、試遊で調整) / ミュートとスライダーの当たり判定を上下に44 CSS pxまで拡大 / 案内文をTOUCH・TAPに切り替え / 描画の解像度を端末の値に戻す(`pixel-ratio.jspre`、unityroomがスマホで1倍に固定するため) / `touch-gestures.jspre`(長押しの文字選択・メニュー、スクロール、タップ後の疑似マウスを抑止) / `audio-unlock.jspre`(指を離したときにも音を開始) / `BangsDisplay.jslib`(キャンバスのCSS倍率とcoarse pointer)。
 - **ヘッドレスChromeのタッチ再現**(`node tools/web-shot/cdp-touch-check.mjs <url> <outDir> <name> [width] [height] [dpr]`)と、**AndroidのChrome実機**(ユーザーの古めの端末。iPhoneは無いのでiOSは確認できない)で確認済み: 読み込み・TOUCH/TAPの文言・ずらす量(60 CSS pxで問題なし)・長押しで文字選択やスクロールが出ない・音(1回目は離すまで鳴らず、2回目から鳴る)・ボタン・縦向きの案内と復帰。
 - **実機でアドレスバーに画面の下(fps)が隠れた** → テンプレートのキャンバスの高さ`100vh`を`100%`+`100dvh`に直して解消(`docs/dev-notes.md`)。**これは手元の確認用ページだけの修正で、unityroomは自前のページを使う。**
-- 実機への配信は`python -m http.server 8770 --bind 0.0.0.0 --directory <ビルド>`で、スマホから`http://192.168.0.53:8770/`(PCの有線LAN。Pythonの受信許可はプライベート・パブリック両方に登録済み)。
+- 実機への配信は`python -m http.server 8770 --bind 0.0.0.0 --directory <ビルド>`で、スマホから`http://<PCのLAN内のアドレス>:8770/`(スマホはPCと同じルーターにつなぐ。Pythonの受信許可はプライベート・パブリック両方に登録済み)。
 - **unityroomに投稿してユーザーが確認した(1回目)**: 縦向きのまま遊べた / 横にすると画質が落ちた。原因はunityroomのゲームページで、スマホでは描画を1倍の解像度に固定し、キャンバスは縦向きでも横長で置く(`docs/dev-notes.md`)。**ユーザー判断で縦向きの判定と案内を外し**、`pixel-ratio.jspre`で解像度を端末の値(上限3)に戻した。unityroomのページを写した確認用ページは`unity/Build/WebGL/ur-test.html`(ビルドで上書きされないが、Buildフォルダを消すと消える。gitの対象外)。
 - **修正版をunityroomへ出し直し、ユーザーがスマホで動作と表示を確認した**(横向きでも画質が落ちず、縦向きでも遊べる)。unityroomのページの黒帯や配置はビルドからは変えない。表示の大きさに不満が出たら、ゲーム内の全画面ボタン(AndroidのChromeならボタンを押したときに全画面にできる)などを検討する。**iPhoneでの挙動は未確認**(確かめる端末が無い)。
 
@@ -81,7 +81,7 @@ node tools/web-shot/cdp-audio-check.mjs <url> <outDir> <name> [bangHoldMs] [hudS
 
 ## 2. このプロジェクトの2つの目的
 
-1. マウスのみで遊ぶゲームを作る(仕様: `docs/game-concept.md`)
+1. 長押しで遊ぶゲームを作る(PCはマウス、スマホはタッチ。仕様: `docs/game-concept.md`)
 2. **Claude Codeからどれだけタスクを分散できるかの実験**。Claude CodeはBrain(実装せず、分解・委任・検証・記録を担う)として動き、agyとdiscord-ai-hubに委任する。記録は`docs/model-experiment-log.md`。
 
 ## 3. 最初に押さえる運用ルール(詳細は`CLAUDE.md`と`docs/workflow.md`)
@@ -129,7 +129,7 @@ node tools/web-shot/cdp-audio-check.mjs <url> <outDir> <name> [bangHoldMs] [hudS
 2. **揺動ありを別の遊び方として出すか**: ユーザーは「以前のランダム性にも別の面白さがあった」と言っている(JS版は揺動ありのまま)。
 3. **ゲームバランス**(`R_MAX_RATIO`・`F_CREEP`・`TAU_R`)は煮詰め途中。易しくする方向は確認してから。
 4. **仕様書の更新**: `docs/game-concept.md`の「音」の節が古い。Unity版だけの要素(HUD倍率・音量・星・ランキング)は仕様書に無く、`docs/unity-port-plan.md` §5にある。未確定事項2つ(「一度離したら即終了」で良いか、ビッグバン演出の作り込み)も残る。
-5. **GitHubの扱い**: リポジトリを公開に戻すか、PagesでJS版を再公開するか。Unity版の到達点にタグを打つか(既存は`v1`・`v1.1`)。
+5. **GitHubの扱い**: 公開に戻すことは決定(切り替えはユーザー)。残っているのは、PagesでJS版を再公開するか / Unity版の到達点にタグを打つか(既存は`v1`・`v1.1`) / ライセンスを付けるか / コミットの作者欄のメールアドレスをそのままにするか(`docs/dev-notes.md`。Brainは書き換えないことを推奨)。READMEにunityroomのURLを入れる(URLをユーザーに確認する)。
 6. **165Hz表示では動きが60Hzに量子化される**(固定ステップの副作用)。指摘は無し。
 7. **ビルドの縮小案**(フォントを使う文字だけにする8.9MB減など)はユーザー判断で見送り。容量で困ったら再検討。
 8. **細かい残り**: Unity Cloudの紐付け(`cloudProjectId`)を外すか / 不要パッケージ(Visual Scripting等)の整理 / vivoxスキルを残すか / MCPの未検証2点(推論トークンだけで出力上限を使い切る経路、326秒超の`compare`)。
