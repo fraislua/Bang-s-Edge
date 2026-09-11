@@ -9,7 +9,7 @@
 
 ## このリポジトリについて
 
-ゲームづくりと同時に、**AIにどこまで作業を分散させられるか**を試したプロジェクト。Claude Code(Opus 5)を「Brain」としてタスクの分解・委任先の選択・検証・記録に専念させ、実装の多くはAntigravity CLI(agy)経由のGeminiなどや、discord-ai-hub経由のGPT・Grokなどに委任した。委任の成否や判断の記録も含めて置いている。
+ゲームづくりと同時に、**AIにどこまで作業を分散させられるか**を試したプロジェクト。Claude Code(Opus 5)を「Brain」としてタスクの分解・委任先の選択・検証・記録に専念させ、実装の多くはAntigravity CLI(agy)経由のGeminiなどや、discord-ai-hub(自宅のミニPCで動かしている自作のDiscord AIボット。MCPサーバーとしても使え、ローカルLLMやGemini・Grok・GPTを呼び出せる)経由のGPT・Grokなどに委任した。委任の成否や判断の記録も含めて置いている。
 
 ## 構成
 
