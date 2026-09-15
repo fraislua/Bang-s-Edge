@@ -29,6 +29,10 @@ namespace BangsEdge.Game
         private bool _isDraggingVolume;
         private float _lastSetVolume = -1f;
         private GameState _observedState = GameState.Ready;
+        private RenderInterpolator _interpolator;
+        private float[] _renderX;
+        private float[] _renderY;
+        private const bool RENDER_INTERPOLATION_ENABLED = true;
 
         /// <summary>
         /// 指数移動平均によるFPS推定値 (P5のHUD表示等で使用)。
@@ -56,6 +60,9 @@ namespace BangsEdge.Game
 
             // シミュレーション初期化 (WebAudioEvents 経由で WebGL 音響イベントを中継)
             _sim = new BangSimulation(rng, new WebAudioEvents());
+            _interpolator = new RenderInterpolator(GameConfig.TOTAL_PARTICLES);
+            _renderX = new float[GameConfig.TOTAL_PARTICLES];
+            _renderY = new float[GameConfig.TOTAL_PARTICLES];
             _sim.HighScore = _savedHighScore;
             _sim.BestBangSeconds = PlayerPrefs.GetFloat(BEST_BANG_TIME_KEY, 0f);
             UnityroomRanking.Initialize();
@@ -100,6 +107,7 @@ namespace BangsEdge.Game
             int steps = 0;
             while (_accumulator >= GameConfig.FIXED_DT && steps < GameConfig.MAX_SUBSTEPS)
             {
+                _interpolator.CapturePrevious(_sim.X, _sim.Y);
                 _simNow += GameConfig.FIXED_DT * 1000.0;
                 _sim.Step(GameConfig.FIXED_DT, _simNow);
                 _accumulator -= GameConfig.FIXED_DT;
@@ -107,16 +115,25 @@ namespace BangsEdge.Game
             }
 
             // 上限まで進めても追いつけない場合は残りを捨てる (スローモーションにはなるが破綻はしない)
+            double renderAlpha;
             if (_accumulator >= GameConfig.FIXED_DT)
             {
                 _accumulator = 0.0;
                 _simNow = timestamp;
+                renderAlpha = 1.0; // 捨てた分は current にスナップする(previous側へ戻すと見た目が逆流する)
             }
+            else
+            {
+                renderAlpha = _accumulator / GameConfig.FIXED_DT;
+            }
+            if (!RENDER_INTERPOLATION_ENABLED) renderAlpha = 1.0;
+
+            _interpolator.Sample(renderAlpha, _sim.X, _sim.Y, _renderX, _renderY);
 
             HandleRoundTransitions();
 
             // 3. 描画更新
-            _renderer.Render(_sim, timestamp);
+            _renderer.Render(_sim, timestamp, _renderX, _renderY);
             _hud.Render(_sim, timestamp, _fpsEstimate);
         }
 
@@ -191,6 +208,7 @@ namespace BangsEdge.Game
                     // JS版では performance.now() (実時間ミリ秒) を渡す
                     double realNowMs = Time.realtimeSinceStartupAsDouble * 1000.0;
                     _sim.StartRound(realNowMs);
+                    _interpolator.Reset();
                 }
             }
             else if (_isDraggingVolume && pointer.press.isPressed)

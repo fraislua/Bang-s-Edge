@@ -235,7 +235,7 @@ namespace BangsEdge.Game
         /// <summary>
         /// 毎フレームの描画更新を行う。
         /// </summary>
-        public void Render(BangSimulation sim, double nowMs)
+        public void Render(BangSimulation sim, double nowMs, float[] renderX, float[] renderY)
         {
             if (sim == null) return;
 
@@ -270,7 +270,7 @@ namespace BangsEdge.Game
             }
 
             // 3. 粒子の描画
-            RenderParticles(sim);
+            RenderParticles(sim, renderX, renderY);
 
             // 4. フラッシュの描画
             if (sim.FlashOpacity > 0.0)
@@ -370,7 +370,7 @@ namespace BangsEdge.Game
             _measureTargetSr.transform.localPosition = new Vector3((float)sim.CursorX, (float)(-sim.CursorY), 0f);
         }
 
-        private void RenderParticles(BangSimulation sim)
+        private void RenderParticles(BangSimulation sim, float[] renderX, float[] renderY)
         {
             // 状態に応じた色とパラメータの決定 (drawParticles に準拠)
             Color outerColor = new Color(203f / 255f, 213f / 255f, 225f / 255f, 1f); // #cbd5e1
@@ -413,8 +413,8 @@ namespace BangsEdge.Game
             for (int i = 0; i < GameConfig.TOTAL_PARTICLES; i++)
             {
                 var view = _particleViews[i];
-                float px = (float)sim.X[i];
-                float py = (float)(-sim.Y[i]);
+                float px = renderX[i];
+                float py = -renderY[i];
                 bool outOfReach = sim.OutOfReach[i];
                 bool inMeasure = sim.InMeasure[i];
 
