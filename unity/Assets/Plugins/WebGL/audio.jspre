@@ -2,6 +2,7 @@
  * Bang's-Edge - Audio Controller (Web Audio API)
  * docs/game-concept.md の「音」節に基づく実装
  * 外部音声ファイルを使用せず、すべて Web Audio API でリアルタイム合成
+ * （Unity WebGL版: playResolve に際どさ (edgeRatio, graceWindow) の引数・層4/層5を追加）
  */
 
 (function (window) {
@@ -615,33 +616,42 @@
   }
 
   /**
-   * リリース確定音 (全体0.60秒、すべて指数減衰 setTargetAtTime)
+   * リリース確定音 (全体0.75秒、すべて指数減衰 setTargetAtTime)
    * 失敗音と同じ素材で「110が残り、165が残る」という対比を構築
-   * 層1 アタック: ノイズ → highpass 600Hz(Q 0.7)、gain 0.16 → 0、tau 0.040s
+   * @param {number} [edgeRatio=0.7] 離した瞬間の危険度 [0, 1]
+   * @param {number} [graceWindow=0.0] 猶予窓の進行度 [0, 1] (しきい値超過時のみ > 0)
+   * 層1 アタック: ノイズ → highpass 600Hz(Q 0.7)、gain 0.16 * (0.7 + 0.3 * edge) → 0、tau 0.040s
    * 層2 ボディ:
    *   - sine 110Hz: gain 0.42、tau 0.20s
-   *   - sine 165Hz: 開始0.015秒後にgain 0→0.30へ0.05秒でランプ、その後 tau 0.28s (確定の核)
+   *   - sine 165Hz: 開始0.015秒後にgain 0→0.30 * (0.8 + 0.2 * edge)へ0.05秒でランプ、その後 tau 0.28s (確定の核)
    *   - sine 55Hz: gain 0.10、tau 0.12s
    *   - sine 220Hz: 開始0.03秒後から、gain 0.06、tau 0.18s
    *   - ボディ全体にローパス 1600Hz固定、Q 0.9(スイープしない)
    * 層3 余韻: ノイズ → bandpass 500Hz(Q 3.5)、gain 0.045、tau 0.32s
+   * 層4 輝き (bodyFilter): sine 330Hz、gain 0.14 * edge^2、tau 0.30s
+   * 層5 縁越え (win > 0 のみ):
+   *   - 5-1 チャープ (bodyFilter): sine 660Hz -> 990Hz、gain 0.10 * (0.5 + 0.5 * win)、tau 0.28s
+   *   - 5-2 きらめき (masterGain直結): ノイズ bandpass 2400Hz (Q 6)、gain 0.04 * win、tau 0.22s
    * ※ ピッチのグリッサンドは一切しない
    */
-  function playResolve() {
+  function playResolve(edgeRatio, graceWindow) {
     stopDrone();
     pulseTimer = 0;
     if (isMutedState || !audioCtx) return;
 
     try {
+      var edge = (typeof edgeRatio === 'number' && isFinite(edgeRatio)) ? Math.min(1, Math.max(0, edgeRatio)) : 0.7;
+      var win = (typeof graceWindow === 'number' && isFinite(graceWindow)) ? Math.min(1, Math.max(0, graceWindow)) : 0;
+
       if (!noiseBuffer) {
         createNoiseBuffer();
       }
 
       const now = audioCtx.currentTime;
-      const duration = 0.60;
+      const duration = 0.75;
       const stopTime = now + duration + 0.05;
 
-      // === 層1: アタック (ノイズ → highpass 600Hz, Q 0.7, gain 0.16 → 0, tau 0.040s) ===
+      // === 層1: アタック (ノイズ → highpass 600Hz, Q 0.7, gain 0.16 * (0.7 + 0.3 * edge) → 0, tau 0.040s) ===
       if (noiseBuffer) {
         const attackSource = audioCtx.createBufferSource();
         attackSource.buffer = noiseBuffer;
@@ -653,7 +663,7 @@
         attackFilter.Q.setValueAtTime(0.7, now);
 
         const attackGain = audioCtx.createGain();
-        attackGain.gain.setValueAtTime(0.16, now);
+        attackGain.gain.setValueAtTime(0.16 * (0.7 + 0.3 * edge), now);
         attackGain.gain.setTargetAtTime(0, now, 0.040);
 
         attackSource.connect(attackFilter);
@@ -684,14 +694,14 @@
       osc110.start(now);
       osc110.stop(stopTime);
 
-      // 2-2. sine 165Hz: 開始0.015秒後にgain 0→0.30へ0.05秒でランプ、その後 tau 0.28s (確定の核)
+      // 2-2. sine 165Hz: 開始0.015秒後にgain 0→0.30 * (0.8 + 0.2 * edge)へ0.05秒でランプ、その後 tau 0.28s (確定の核)
       const osc165 = audioCtx.createOscillator();
       const gain165 = audioCtx.createGain();
       osc165.type = 'sine';
       osc165.frequency.setValueAtTime(165, now);
       gain165.gain.setValueAtTime(0.0001, now);
       gain165.gain.setValueAtTime(0.0001, now + 0.015);
-      gain165.gain.linearRampToValueAtTime(0.30, now + 0.065);
+      gain165.gain.linearRampToValueAtTime(0.30 * (0.8 + 0.2 * edge), now + 0.065);
       gain165.gain.setTargetAtTime(0, now + 0.065, 0.28);
       osc165.connect(gain165);
       gain165.connect(bodyFilter);
@@ -747,6 +757,63 @@
 
         tailSource.start(now);
         tailSource.stop(stopTime);
+      }
+
+      // === 層4: 輝き (bodyFilter を通す: sine 330Hz, 開始 now + 0.02, gain 0.14 * edge^2, tau 0.30s) ===
+      const shineOsc = audioCtx.createOscillator();
+      const shineGain = audioCtx.createGain();
+      shineOsc.type = 'sine';
+      shineOsc.frequency.setValueAtTime(330, now);
+      shineGain.gain.setValueAtTime(0.0001, now);
+      shineGain.gain.setValueAtTime(0.0001, now + 0.02);
+      shineGain.gain.linearRampToValueAtTime(0.14 * edge * edge, now + 0.025);
+      shineGain.gain.setTargetAtTime(0, now + 0.025, 0.30);
+      shineOsc.connect(shineGain);
+      shineGain.connect(bodyFilter);
+      shineOsc.start(now);
+      shineOsc.stop(stopTime);
+
+      // === 層5: 縁越え (win > 0 のときのみ生成) ===
+      if (win > 0) {
+        // 5-1. チャープ (bodyFilter を通す: sine 660Hz -> 990Hz 上昇)
+        const chirpOsc = audioCtx.createOscillator();
+        const chirpGain = audioCtx.createGain();
+        chirpOsc.type = 'sine';
+        chirpOsc.frequency.setValueAtTime(660, now + 0.03);
+        chirpOsc.frequency.exponentialRampToValueAtTime(990, now + 0.28);
+        chirpGain.gain.setValueAtTime(0.0001, now);
+        chirpGain.gain.setValueAtTime(0.0001, now + 0.03);
+        chirpGain.gain.linearRampToValueAtTime(0.10 * (0.5 + 0.5 * win), now + 0.035);
+        chirpGain.gain.setTargetAtTime(0, now + 0.035, 0.28);
+        chirpOsc.connect(chirpGain);
+        chirpGain.connect(bodyFilter);
+        chirpOsc.start(now);
+        chirpOsc.stop(stopTime);
+
+        // 5-2. きらめき (masterGain へ直結: 帯域制限ノイズ)
+        if (noiseBuffer) {
+          const sparkleSource = audioCtx.createBufferSource();
+          sparkleSource.buffer = noiseBuffer;
+          sparkleSource.loop = true;
+
+          const sparkleFilter = audioCtx.createBiquadFilter();
+          sparkleFilter.type = 'bandpass';
+          sparkleFilter.frequency.setValueAtTime(2400, now);
+          sparkleFilter.Q.setValueAtTime(6, now);
+
+          const sparkleGain = audioCtx.createGain();
+          sparkleGain.gain.setValueAtTime(0.0001, now);
+          sparkleGain.gain.setValueAtTime(0.0001, now + 0.03);
+          sparkleGain.gain.linearRampToValueAtTime(0.04 * win, now + 0.035);
+          sparkleGain.gain.setTargetAtTime(0, now + 0.035, 0.22);
+
+          sparkleSource.connect(sparkleFilter);
+          sparkleFilter.connect(sparkleGain);
+          sparkleGain.connect(masterGain);
+
+          sparkleSource.start(now);
+          sparkleSource.stop(stopTime);
+        }
       }
     } catch (e) {}
   }

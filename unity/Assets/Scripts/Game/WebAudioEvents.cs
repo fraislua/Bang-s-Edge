@@ -12,6 +12,9 @@ namespace BangsEdge.Game
     /// </summary>
     public sealed class WebAudioEvents : IAudioEvents
     {
+        private double _nextResolveEdge = 0.7;    // 既定値 (SetNextResolve が呼ばれなかったときの従来相当)
+        private double _nextResolveWindow = 0.0;
+
 #if UNITY_WEBGL && !UNITY_EDITOR
         [DllImport("__Internal")]
         private static extern void BangsAudio_StartDrone();
@@ -23,7 +26,7 @@ namespace BangsEdge.Game
         private static extern void BangsAudio_UpdateWarning(double dangerRatio, double dt);
 
         [DllImport("__Internal")]
-        private static extern void BangsAudio_PlayResolve();
+        private static extern void BangsAudio_PlayResolve(double edge, double window);
 
         [DllImport("__Internal")]
         private static extern void BangsAudio_PlayBigBang();
@@ -40,6 +43,17 @@ namespace BangsEdge.Game
         [DllImport("__Internal")]
         private static extern double BangsAudio_GetVolume();
 #endif
+
+        /// <summary>
+        /// 次に PlayResolve() が鳴らす確定音の際どさを指定する。両引数は 0〜1 にクランプする。
+        /// </summary>
+        public void SetNextResolve(double edge, double window)
+        {
+            if (double.IsNaN(edge)) edge = 0.7;
+            if (double.IsNaN(window)) window = 0.0;
+            _nextResolveEdge = edge < 0.0 ? 0.0 : (edge > 1.0 ? 1.0 : edge);
+            _nextResolveWindow = window < 0.0 ? 0.0 : (window > 1.0 ? 1.0 : window);
+        }
 
         public void StartDrone()
         {
@@ -65,8 +79,10 @@ namespace BangsEdge.Game
         public void PlayResolve()
         {
 #if UNITY_WEBGL && !UNITY_EDITOR
-            BangsAudio_PlayResolve();
+            BangsAudio_PlayResolve(_nextResolveEdge, _nextResolveWindow);
 #endif
+            _nextResolveEdge = 0.7;
+            _nextResolveWindow = 0.0;
         }
 
         public void PlayBigBang()

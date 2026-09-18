@@ -17,9 +17,9 @@ mergeInto(LibraryManager.library, {
     }
   },
 
-  BangsAudio_PlayResolve: function () {
+  BangsAudio_PlayResolve: function (edgeRatio, graceWindow) {
     if (typeof window !== 'undefined' && window.AudioController && typeof window.AudioController.playResolve === 'function') {
-      window.AudioController.playResolve();
+      window.AudioController.playResolve(edgeRatio, graceWindow);
     }
   },
 
