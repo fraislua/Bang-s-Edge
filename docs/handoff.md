@@ -40,7 +40,7 @@
 - **きっかけ**: 公開1週間のランキング(約68人)で、スコア上位が猶予5ステップ(83ms)の中で離している(9599点=192個)こと、1粒子=50点で同点が多いことが分かった。ユーザーの方針: **スコア式・しきい値・ボードは変えない、ランダム性は足さない**(デイリーシード・揺動モードは却下)。grok(`xai/grok-4.6`、Vertex枠)に別視点を1回聞いた(`docs/cost-log.md`)。
 - **入れたもの**(決定の経緯は`docs/unity-port-plan.md` §5-12、仕様は`docs/game-concept.md`「Unity 版で追加・変更した要素」): (1) 確定画面に「165 / 200 PARTICLES (LIMIT -5)」と「0.15s TO BANG」、しきい値越えなら金色で「OVER THE EDGE 3/5 …」(`Simulation/MarginProbe.cs`が離す前の複製を毎フレーム30ステップずつ進める) (2) 確定音を際どさで変える(`audio.jspre`の`playResolve(edgeRatio, graceWindow)`)+Androidの振動(`WebHaptics.cs`/`BangsHaptics.jslib`) (3) タイトル右下の自動デモ小窓(`Game/TitleDemo.cs`) (4) 押している間しきい値を越えたら密度バー右に猶予5目盛り(`GameHud.SHOW_LIVE_EDGE_TICKS`)。
 - **検証済み**: EditMode 31/31(新規`MarginProbeTests.cs`12件: 複製が300ステップ並走で毎ステップ一致・探索の予測が元の発火ステップと一致・元を変えない)。無圧縮ビルドの撮影で、デモ小窓の描画と文字、確定画面の2行を確認。
-- **未確認(ユーザーの試遊待ち)**: しきい値越えで離したときの「OVER THE EDGE」と目盛り(83msの窓はヘッドレスで狙えない) / 確定音の聴感 / Android実機の振動 / 目盛りを押している間も出すか(`SHOW_LIVE_EDGE_TICKS`で消せる) / デモ小窓の位置・大きさ・文字の大きさ。
+- **ユーザーの試遊(2026-09-18)**: 「OVER THE EDGE」の表示、確定音、振動、デモ小窓はそのまま採用。**密度バー横の猶予目盛りは「ゲーム中にそこを見る余裕が無い」ため停止**(`GameHud.SHOW_LIVE_EDGE_TICKS = false`、コードは残す)。代わりにユーザー案で、カーソル中央の測定円(水色の点線)の外周を5分割した弧(半径52、金色)を`GraceCounter`の分だけ点灯させる(`GameRenderer`、agyに委任して実装済み。EditMode 31/31。撮影では83msの窓を狙えないので、弧の見え方はユーザーの試遊で確認する)。
 - **未実施**: unityroomへの公開ビルド(手順は下)と、紹介文の差し替え(`docs/unityroom-description.md`に下書き)。
 
 ### unityroomへ公開ビルドを出す手順(次の更新でもこのとおりにする)
