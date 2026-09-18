@@ -19,6 +19,7 @@ namespace BangsEdge.Game
 
         // 共通マテリアル
         private Material _sharedSpriteMaterial;
+        public Material SharedSpriteMaterial => _sharedSpriteMaterial;
 
         // 生成スプライト
         private Sprite _circleSprite;
@@ -458,7 +459,7 @@ namespace BangsEdge.Game
         /// 縁をアンチエイリアスで滑らかにした円スプライトを生成する。
         /// 直径 1.0 ワールド単位相当 (半径 0.5) になるよう pixelsPerUnit を設定する。
         /// </summary>
-        private static Sprite CreateCircleSprite(int size, float r)
+        internal static Sprite CreateCircleSprite(int size, float r)
         {
             var tex = new Texture2D(size, size, TextureFormat.RGBA32, false)
             {
@@ -570,7 +571,7 @@ namespace BangsEdge.Game
         /// <summary>
         /// フラッシュ用の 1x1 白スプライトを生成する。
         /// </summary>
-        private static Sprite CreateSolidSprite()
+        internal static Sprite CreateSolidSprite()
         {
             var tex = new Texture2D(2, 2, TextureFormat.RGBA32, false)
             {
