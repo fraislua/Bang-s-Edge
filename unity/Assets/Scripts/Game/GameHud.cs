@@ -17,6 +17,7 @@ namespace BangsEdge.Game
         // ユーザーの方針は「少し大きすぎるくらいで見えるのが良い」(2026-09-11)。1にするとJS版と同じ大きさに戻る。
         // 位置は最寄りの画面端か中央からの距離を広げるので、部品同士の並び方はJS版と変わらない
         public const float HudScale = 2f;
+        public const bool SHOW_LIVE_EDGE_TICKS = true;
 
         private static readonly float LogicalW = GameConfig.LOGICAL_WIDTH;
         private static readonly float LogicalH = GameConfig.LOGICAL_HEIGHT;
@@ -86,6 +87,8 @@ namespace BangsEdge.Game
         private GameObject _readyGroup;
         private GameObject _resolvedGroup;
         private Text _resolvedScoreText;
+        private Text _resolvedCountText;
+        private Text _resolvedMarginText;
         private Text _resolvedNewHighText;
         private GameObject _bangGroup;
         private Text _bangTimeText;
@@ -95,6 +98,17 @@ namespace BangsEdge.Game
         private Text _bangSubText;
         private bool _isTouchLabelsInitialized;
         private bool _lastTouchLabelsMode;
+
+        private int _releaseMeasureCount;
+        private int _releaseGraceCounter;
+        private bool _releaseProbeDone;
+        private int _releaseStepsToBang = -1;
+        private bool _releaseInfoDirty;
+
+        // 猶予窓の目盛り
+        private Image[] _edgeTickImages;
+        private bool _edgeTicksVisible;
+        private int _cachedEdgeTicksLit = -1;
 
         // ミュートボタン
         private Image _muteBtnImage;
@@ -502,6 +516,23 @@ namespace BangsEdge.Game
             _barFillImage.raycastTarget = false;
             _barFillImage.enabled = false;
 
+            // 猶予窓の目盛り (密度バーの右隣。幅8・高さ14、左端 x = 1182 + i * 12、上端 y = 24)
+            _edgeTickImages = new Image[GameConfig.BANG_GRACE_FRAMES];
+            for (int i = 0; i < GameConfig.BANG_GRACE_FRAMES; i++)
+            {
+                var edgeTickGo = new GameObject($"EdgeTick_{i}");
+                edgeTickGo.transform.SetParent(hudRoot.transform, false);
+                var edgeTickRt = edgeTickGo.AddComponent<RectTransform>();
+                float edgeTickX = 1182f + i * 12f;
+                float edgeTickY = 24f;
+                SetTopLeft(edgeTickRt, new Vector2(FromCenterX(edgeTickX), -FromTop(edgeTickY)), new Vector2(Px(8f), Px(14f)));
+                var edgeTickImg = edgeTickGo.AddComponent<Image>();
+                edgeTickImg.sprite = _solidWhiteSprite;
+                edgeTickImg.raycastTarget = false;
+                edgeTickGo.SetActive(false);
+                _edgeTickImages[i] = edgeTickImg;
+            }
+
             // 2. 85% 線 (x = 750 + 420*0.85 = 1107, y は 21〜41, 線幅2, #ff3333)
             var limitLineGo = new GameObject("LimitLine");
             limitLineGo.transform.SetParent(hudRoot.transform, false);
@@ -698,9 +729,11 @@ namespace BangsEdge.Game
 
             CreateText(_resolvedGroup.transform, "Title", "ROUND RESOLVED!", Px(24), FontStyle.Bold, new Color(0f, 229f / 255f, 1f, 1f), TextAnchor.LowerCenter, FromCenterX(960f), FromCenterY(515f));
             _resolvedScoreText = CreateText(_resolvedGroup.transform, "Score", "SCORE: 0", Px(36), FontStyle.Bold, Color.white, TextAnchor.LowerCenter, FromCenterX(960f), FromCenterY(558f));
-            _resolvedNewHighText = CreateText(_resolvedGroup.transform, "NewHigh", "★ NEW HIGH SCORE! ★", Px(14), FontStyle.Bold, new Color(1f, 215f / 255f, 0f, 1f), TextAnchor.LowerCenter, FromCenterX(960f), FromCenterY(585f));
+            _resolvedCountText = CreateText(_resolvedGroup.transform, "Count", $"0 / {GameConfig.TOTAL_PARTICLES} PARTICLES", Px(14), FontStyle.Bold, new Color(226f / 255f, 232f / 255f, 240f / 255f, 1f), TextAnchor.LowerCenter, FromCenterX(960f), FromCenterY(585f));
+            _resolvedMarginText = CreateText(_resolvedGroup.transform, "Margin", string.Empty, Px(14), FontStyle.Bold, new Color(226f / 255f, 232f / 255f, 240f / 255f, 1f), TextAnchor.LowerCenter, FromCenterX(960f), FromCenterY(607f));
+            _resolvedNewHighText = CreateText(_resolvedGroup.transform, "NewHigh", "★ NEW HIGH SCORE! ★", Px(14), FontStyle.Bold, new Color(1f, 215f / 255f, 0f, 1f), TextAnchor.LowerCenter, FromCenterX(960f), FromCenterY(630f));
             _resolvedNewHighText.gameObject.SetActive(false);
-            _resolvedSubText = CreateText(_resolvedGroup.transform, "Sub", "CLICK TO START NEXT ROUND", Px(14), FontStyle.Normal, new Color(148f / 255f, 163f / 255f, 184f / 255f, 1f), TextAnchor.LowerCenter, FromCenterX(960f), FromCenterY(615f));
+            _resolvedSubText = CreateText(_resolvedGroup.transform, "Sub", "CLICK TO START NEXT ROUND", Px(14), FontStyle.Normal, new Color(148f / 255f, 163f / 255f, 184f / 255f, 1f), TextAnchor.LowerCenter, FromCenterX(960f), FromCenterY(655f));
 
             // --- Bang ---
             _bangGroup = new GameObject("BangGroup");
@@ -752,6 +785,18 @@ namespace BangsEdge.Game
                     ? "TAP TO RETRY"
                     : "CLICK TO RETRY";
             }
+        }
+
+        /// <summary>
+        /// 離した直後の情報。probeDone=false のうちは秒数の行を空にしておく
+        /// </summary>
+        public void SetReleaseInfo(int measureCount, int graceAtRelease, bool probeDone, int stepsToBang)
+        {
+            _releaseMeasureCount = measureCount;
+            _releaseGraceCounter = graceAtRelease;
+            _releaseProbeDone = probeDone;
+            _releaseStepsToBang = stepsToBang;
+            _releaseInfoDirty = true;
         }
 
         private Text CreateText(
@@ -832,6 +877,9 @@ namespace BangsEdge.Game
             // 1. 密度バーの更新
             UpdateDensityBar(sim, nowMs);
 
+            // 猶予窓の目盛りの更新
+            UpdateEdgeTicks(sim);
+
             // 2. 危険度ステージの更新
             UpdateDangerStage(sim, nowMs);
 
@@ -893,6 +941,56 @@ namespace BangsEdge.Game
             else
             {
                 if (_barFillImage.enabled) _barFillImage.enabled = false;
+            }
+        }
+
+        private void UpdateEdgeTicks(BangSimulation sim)
+        {
+            if (_edgeTickImages == null) return;
+
+            bool shouldShow = SHOW_LIVE_EDGE_TICKS && sim.State == GameState.Attracting && sim.GraceCounter > 0;
+            if (!shouldShow)
+            {
+                if (_edgeTicksVisible)
+                {
+                    _edgeTicksVisible = false;
+                    _cachedEdgeTicksLit = -1;
+                    for (int i = 0; i < _edgeTickImages.Length; i++)
+                    {
+                        if (_edgeTickImages[i] != null)
+                        {
+                            _edgeTickImages[i].gameObject.SetActive(false);
+                        }
+                    }
+                }
+                return;
+            }
+
+            if (!_edgeTicksVisible)
+            {
+                _edgeTicksVisible = true;
+                for (int i = 0; i < _edgeTickImages.Length; i++)
+                {
+                    if (_edgeTickImages[i] != null)
+                    {
+                        _edgeTickImages[i].gameObject.SetActive(true);
+                    }
+                }
+            }
+
+            int grace = sim.GraceCounter;
+            if (grace != _cachedEdgeTicksLit)
+            {
+                _cachedEdgeTicksLit = grace;
+                for (int i = 0; i < _edgeTickImages.Length; i++)
+                {
+                    if (_edgeTickImages[i] != null)
+                    {
+                        _edgeTickImages[i].color = (i < grace)
+                            ? new Color(1f, 1f, 1f, 1f)
+                            : new Color(1f, 1f, 1f, 0.15f);
+                    }
+                }
             }
         }
 
@@ -1086,6 +1184,49 @@ namespace BangsEdge.Game
                 {
                     _cachedIsNewHigh = isNewHigh;
                     _resolvedNewHighText.gameObject.SetActive(isNewHigh);
+                }
+
+                if (_releaseInfoDirty)
+                {
+                    _releaseInfoDirty = false;
+                    int diff = _releaseMeasureCount - GameConfig.REQUIRED_PARTICLES;
+                    string diffStr = diff > 0 ? $"+{diff}" : (diff < 0 ? diff.ToString() : "±0");
+                    _resolvedCountText.text = $"{_releaseMeasureCount} / {GameConfig.TOTAL_PARTICLES} PARTICLES   (LIMIT {diffStr})";
+
+                    if (!_releaseProbeDone)
+                    {
+                        _resolvedMarginText.text = string.Empty;
+                    }
+                    else
+                    {
+                        if (_releaseGraceCounter > 0)
+                        {
+                            _resolvedMarginText.color = new Color(1f, 215f / 255f, 0f, 1f);
+                            if (_releaseStepsToBang >= 0)
+                            {
+                                string secStr = (_releaseStepsToBang * GameConfig.FIXED_DT).ToString("F2", CultureInfo.InvariantCulture);
+                                _resolvedMarginText.text = $"OVER THE EDGE  {_releaseGraceCounter}/{GameConfig.BANG_GRACE_FRAMES}   {secStr}s TO BANG";
+                            }
+                            else
+                            {
+                                _resolvedMarginText.text = $"OVER THE EDGE  {_releaseGraceCounter}/{GameConfig.BANG_GRACE_FRAMES}";
+                            }
+                        }
+                        else
+                        {
+                            if (_releaseStepsToBang >= 0)
+                            {
+                                string secStr = (_releaseStepsToBang * GameConfig.FIXED_DT).ToString("F2", CultureInfo.InvariantCulture);
+                                _resolvedMarginText.color = new Color(226f / 255f, 232f / 255f, 240f / 255f, 1f);
+                                _resolvedMarginText.text = $"{secStr}s TO BANG";
+                            }
+                            else
+                            {
+                                _resolvedMarginText.color = new Color(148f / 255f, 163f / 255f, 184f / 255f, 1f);
+                                _resolvedMarginText.text = "BANG WAS MORE THAN 10s AWAY";
+                            }
+                        }
+                    }
                 }
             }
         }

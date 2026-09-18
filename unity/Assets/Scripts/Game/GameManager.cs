@@ -20,6 +20,13 @@ namespace BangsEdge.Game
         private LetterboxCamera _letterbox;
         private GameHud _hud;
 
+        private Mulberry32 _rng;
+        private WebAudioEvents _audioEvents;
+        private readonly MarginProbe _probe = new MarginProbe();
+        private bool _probeResultDelivered = true;
+        private DangerStage _observedStage = DangerStage.Safe;
+        private const int PROBE_STEPS_PER_FRAME = 30;
+
         private double _lastTimestamp;
         private double _simNow;
         private double _accumulator;
@@ -57,9 +64,11 @@ namespace BangsEdge.Game
             uint seed = unchecked((uint)(DateTime.UtcNow.Ticks ^ 0x5DEECE66DL));
             if (seed == 0) seed = 1;
             var rng = new Mulberry32(seed);
+            _rng = rng;
 
             // シミュレーション初期化 (WebAudioEvents 経由で WebGL 音響イベントを中継)
-            _sim = new BangSimulation(rng, new WebAudioEvents());
+            _audioEvents = new WebAudioEvents();
+            _sim = new BangSimulation(rng, _audioEvents);
             _interpolator = new RenderInterpolator(GameConfig.TOTAL_PARTICLES);
             _renderX = new float[GameConfig.TOTAL_PARTICLES];
             _renderY = new float[GameConfig.TOTAL_PARTICLES];
@@ -129,6 +138,32 @@ namespace BangsEdge.Game
             if (!RENDER_INTERPOLATION_ENABLED) renderAlpha = 1.0;
 
             _interpolator.Sample(renderAlpha, _sim.X, _sim.Y, _renderX, _renderY);
+
+            // 危険度の段階が上がった瞬間に短く振動 (押している間だけ)
+            if (_sim.State == GameState.Attracting)
+            {
+                if (_sim.Stage != _observedStage)
+                {
+                    if (_sim.Stage == DangerStage.Warm) WebHaptics.Vibrate(15);
+                    else if (_sim.Stage == DangerStage.Hot) WebHaptics.Vibrate(25);
+                    else if (_sim.Stage == DangerStage.Critical) WebHaptics.Vibrate(40);
+                }
+            }
+            _observedStage = _sim.Stage;
+
+            // 離した後の探索を少しずつ進め、結果が出たら HUD に渡す
+            if (_probe.IsRunning)
+            {
+                _probe.Advance(PROBE_STEPS_PER_FRAME);
+            }
+            if (_probe.IsDone && !_probeResultDelivered)
+            {
+                _probeResultDelivered = true;
+                if (_sim.State == GameState.Resolved)
+                {
+                    _hud.SetReleaseInfo(_sim.FinalMeasureCount, _sim.ReleaseGraceCounter, true, _probe.StepsToBang);
+                }
+            }
 
             HandleRoundTransitions();
 
@@ -209,6 +244,9 @@ namespace BangsEdge.Game
                     double realNowMs = Time.realtimeSinceStartupAsDouble * 1000.0;
                     _sim.StartRound(realNowMs);
                     _interpolator.Reset();
+                    _probe.Reset();
+                    _probeResultDelivered = true;
+                    _observedStage = DangerStage.Safe;
                 }
             }
             else if (_isDraggingVolume && pointer.press.isPressed)
@@ -230,10 +268,33 @@ namespace BangsEdge.Game
                 }
                 else
                 {
-                    _sim.ConfirmRound();
-                    CheckSaveHighScore();
-                    HandleRoundTransitions();
+                    ReleaseRound();
                 }
+            }
+        }
+
+        private void ReleaseRound()
+        {
+            if (_sim == null) return;
+            bool wasAttracting = _sim.State == GameState.Attracting && _sim.IsPressing;
+            if (wasAttracting)
+            {
+                // 1. 際どさを音に渡す (ConfirmRound の中で PlayResolve が呼ばれるので、その前)
+                double releaseEdge = Math.Min(1.0, Math.Max(0.0, _sim.CurrentDangerRatio));
+                double releaseWindow = _sim.GraceCounter / (double)GameConfig.BANG_GRACE_FRAMES;
+                _audioEvents.SetNextResolve(releaseEdge, releaseWindow);
+                // 2. 「離さなかったら何秒後に爆発したか」の探索を、離す前の状態から始める
+                _probe.Begin(_sim, _rng.Clone(), _simNow);
+                _probeResultDelivered = false;
+                // 3. 振動 (窓の中なら強め)
+                WebHaptics.Vibrate(releaseWindow > 0.0 ? 70 : (int)Math.Round(15.0 + 35.0 * releaseEdge));
+            }
+            _sim.ConfirmRound();
+            CheckSaveHighScore();
+            HandleRoundTransitions();
+            if (wasAttracting && _sim.State == GameState.Resolved)
+            {
+                _hud.SetReleaseInfo(_sim.FinalMeasureCount, _sim.ReleaseGraceCounter, false, -1);
             }
         }
 
@@ -243,12 +304,7 @@ namespace BangsEdge.Game
             if (!hasFocus)
             {
                 _isDraggingVolume = false;
-                if (_sim != null)
-                {
-                    _sim.ConfirmRound();
-                    CheckSaveHighScore();
-                    HandleRoundTransitions();
-                }
+                ReleaseRound();
             }
         }
 
@@ -275,6 +331,7 @@ namespace BangsEdge.Game
                 }
                 else if (_observedState == GameState.Attracting && currentState == GameState.Bang)
                 {
+                    WebHaptics.Vibrate(160);
                     UnityroomRanking.SendBangTime(_sim.LastBangSeconds);
                     if (_sim.LastBangWasBest)
                     {
