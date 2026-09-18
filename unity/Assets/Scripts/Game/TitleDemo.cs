@@ -275,7 +275,7 @@ namespace BangsEdge.Game
             _titleTextMesh = titleGo.AddComponent<TextMesh>();
             _titleTextMesh.font = font;
             _titleTextMesh.fontSize = 64;
-            _titleTextMesh.characterSize = 7f;   // TextMesh の高さ ≈ fontSize × characterSize ÷ 10 (デモ論理px)。root の 0.25 倍が掛かる
+            _titleTextMesh.characterSize = 9f;   // TextMesh の高さ ≈ fontSize × characterSize ÷ 10 (デモ論理px)。root の 0.25 倍が掛かる
             _titleTextMesh.anchor = TextAnchor.UpperLeft;
             _titleTextMesh.alignment = TextAlignment.Left;
             _titleTextMesh.color = new Color(148f / 255f, 163f / 255f, 184f / 255f, 1f);
