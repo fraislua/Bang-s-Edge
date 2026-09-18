@@ -93,6 +93,10 @@ namespace BangsEdge.Simulation
         public int GraceCounter { get; private set; }
         public DangerStage Stage { get; private set; }
 
+        public int LastMeasureCount { get; private set; }
+        public int FinalMeasureCount { get; private set; }
+        public int ReleaseGraceCounter { get; private set; }
+
         // 演出値
         public double ShakeMagnitude { get; private set; }
         public double FlashOpacity { get; private set; }
@@ -133,6 +137,77 @@ namespace BangsEdge.Simulation
 
             // コンストラクタの最後で InitParticles() を1回呼ぶ (script.js の初期読み込み時と同じ乱数消費)
             InitParticles();
+        }
+
+        private BangSimulation(BangSimulation source, IRandomSource random)
+        {
+            _random = random ?? throw new ArgumentNullException(nameof(random));
+            _audio = null;
+
+            X = new double[GameConfig.TOTAL_PARTICLES];
+            Y = new double[GameConfig.TOTAL_PARTICLES];
+            VX = new double[GameConfig.TOTAL_PARTICLES];
+            VY = new double[GameConfig.TOTAL_PARTICLES];
+            InMeasure = new bool[GameConfig.TOTAL_PARTICLES];
+            OutOfReach = new bool[GameConfig.TOTAL_PARTICLES];
+
+            Array.Copy(source.X, X, GameConfig.TOTAL_PARTICLES);
+            Array.Copy(source.Y, Y, GameConfig.TOTAL_PARTICLES);
+            Array.Copy(source.VX, VX, GameConfig.TOTAL_PARTICLES);
+            Array.Copy(source.VY, VY, GameConfig.TOTAL_PARTICLES);
+            Array.Copy(source.InMeasure, InMeasure, GameConfig.TOTAL_PARTICLES);
+            Array.Copy(source.OutOfReach, OutOfReach, GameConfig.TOTAL_PARTICLES);
+
+            _repAx = new double[GameConfig.TOTAL_PARTICLES];
+            _repAy = new double[GameConfig.TOTAL_PARTICLES];
+            _clusterX = new double[GameConfig.SPAWN_CLUSTERS];
+            _clusterY = new double[GameConfig.SPAWN_CLUSTERS];
+
+            Width = source.Width;
+            Height = source.Height;
+            EffectiveRMax = source.EffectiveRMax;
+
+            CursorX = source.CursorX;
+            CursorY = source.CursorY;
+
+            State = source.State;
+            IsPressing = source.IsPressing;
+            PressStartTime = source.PressStartTime;
+
+            CurrentDensity = source.CurrentDensity;
+            CurrentDangerRatio = source.CurrentDangerRatio;
+            CurrentScore = source.CurrentScore;
+            FinalScore = source.FinalScore;
+            HighScore = source.HighScore;
+
+            RoundSteps = source.RoundSteps;
+            LastBangSteps = source.LastBangSteps;
+            BestBangSeconds = source.BestBangSeconds;
+            LastBangWasBest = source.LastBangWasBest;
+
+            GraceCounter = source.GraceCounter;
+            Stage = source.Stage;
+
+            ShakeMagnitude = source.ShakeMagnitude;
+            FlashOpacity = source.FlashOpacity;
+
+            ReachableCount = source.ReachableCount;
+            BangPossible = source.BangPossible;
+            UnreachableFrames = source.UnreachableFrames;
+
+            LastMeasureCount = source.LastMeasureCount;
+            FinalMeasureCount = source.FinalMeasureCount;
+            ReleaseGraceCounter = source.ReleaseGraceCounter;
+        }
+
+        /// <summary>
+        /// 現在の状態を丸ごと写した独立したシミュレーションを返す。音は無し (audio = null)。
+        /// 粒子の初期配置 (InitParticles) は呼ばない (乱数を消費してはいけない)。
+        /// </summary>
+        public BangSimulation CloneForProbe(IRandomSource random)
+        {
+            if (random == null) throw new ArgumentNullException(nameof(random));
+            return new BangSimulation(this, random);
         }
 
         public void InitParticles()
@@ -223,6 +298,9 @@ namespace BangsEdge.Simulation
             ReachableCount = GameConfig.TOTAL_PARTICLES;
             BangPossible = true;
             UnreachableFrames = 0;
+            LastMeasureCount = 0;
+            FinalMeasureCount = 0;
+            ReleaseGraceCounter = 0;
             for (int i = 0; i < GameConfig.TOTAL_PARTICLES; i++)
             {
                 OutOfReach[i] = false;
@@ -252,6 +330,8 @@ namespace BangsEdge.Simulation
                 // 正常リリースで確定
                 State = GameState.Resolved;
                 FinalScore = CurrentScore;
+                FinalMeasureCount = LastMeasureCount;
+                ReleaseGraceCounter = GraceCounter;
                 _audio?.PlayResolve();
                 if (FinalScore > HighScore)
                 {
@@ -490,6 +570,7 @@ namespace BangsEdge.Simulation
                 }
 
                 // 密度計算 (※厳守: 分母は集積半径 r(t) ではなく固定の R_MEASURE)
+                LastMeasureCount = nMeasure;
                 CurrentDensity = nMeasure / GameConfig.MEASURE_AREA;
                 CurrentDangerRatio = CurrentDensity / GameConfig.BANG_THRESHOLD;
                 CurrentScore = (int)Math.Floor((CurrentDensity / GameConfig.DENSITY_MAX) * 9999.0);

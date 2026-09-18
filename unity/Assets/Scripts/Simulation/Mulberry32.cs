@@ -35,5 +35,11 @@ namespace BangsEdge.Simulation
         {
             return NextUInt32() / 4294967296.0;
         }
+
+        /// <summary>同じ内部状態 (_state) を持つ独立したインスタンスを返す。</summary>
+        public Mulberry32 Clone()
+        {
+            return new Mulberry32(_state);
+        }
     }
 }
