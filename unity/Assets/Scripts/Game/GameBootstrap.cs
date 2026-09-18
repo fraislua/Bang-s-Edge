@@ -50,6 +50,8 @@ namespace BangsEdge.Game
             hud.Initialize(boardCamera);
             renderer.Initialize();
             manager.Initialize(renderer, letterbox, hud);
+            var titleDemo = managerGo.AddComponent<TitleDemo>();
+            titleDemo.Initialize(renderer, manager);
 
             // シーン再読込時にも保持
             Object.DontDestroyOnLoad(boardCamera.gameObject);
