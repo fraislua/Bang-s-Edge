@@ -17,7 +17,7 @@ namespace BangsEdge.Game
         // ユーザーの方針は「少し大きすぎるくらいで見えるのが良い」(2026-09-11)。1にするとJS版と同じ大きさに戻る。
         // 位置は最寄りの画面端か中央からの距離を広げるので、部品同士の並び方はJS版と変わらない
         public const float HudScale = 2f;
-        public const bool SHOW_LIVE_EDGE_TICKS = true;
+        public const bool SHOW_LIVE_EDGE_TICKS = false; // 2026-09-18 試遊: ゲーム中にバー横を見る余裕が無いので停止。猶予の表示は測定円の外周の弧(GameRenderer)に移した
 
         private static readonly float LogicalW = GameConfig.LOGICAL_WIDTH;
         private static readonly float LogicalH = GameConfig.LOGICAL_HEIGHT;
