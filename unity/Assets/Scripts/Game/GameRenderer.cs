@@ -38,6 +38,18 @@ namespace BangsEdge.Game
         // 測定ターゲット (点線測定円 & 中心十字)
         private SpriteRenderer _measureTargetSr;
 
+        // 猶予インジケーター (測定円外周の5分割の弧)
+        private const float EDGE_ARC_RADIUS = 52f;
+        private const int EDGE_ARC_VERTICES = 12;
+        private const float EDGE_ARC_GAP_DEG = 12f;
+        private const float EDGE_ARC_WIDTH = 4f;
+        private readonly Color _edgeArcLit = new Color(1f, 215f / 255f, 0f, 1f);
+        private readonly Color _edgeArcDim = new Color(1f, 1f, 1f, 0.18f);
+
+        private Transform _edgeArcsRoot;
+        private LineRenderer[] _edgeArcLines;
+        private int _cachedEdgeArcsLit = -1;
+
         // フラッシュ
         private SpriteRenderer _flashSr;
 
@@ -144,6 +156,51 @@ namespace BangsEdge.Game
             // JS draws the fields (including this target) before the particles, so it sits beneath them
             _measureTargetSr.sortingOrder = 3;
             _measureTargetSr.enabled = false;
+
+            BuildEdgeArcs();
+        }
+
+        private void BuildEdgeArcs()
+        {
+            var edgeArcRootGo = new GameObject("EdgeArcs");
+            edgeArcRootGo.transform.SetParent(_worldContainer.transform, false);
+            _edgeArcsRoot = edgeArcRootGo.transform;
+
+            int edgeArcCount = GameConfig.BANG_GRACE_FRAMES;
+            _edgeArcLines = new LineRenderer[edgeArcCount];
+
+            float edgeArcSpan = 360f / edgeArcCount - EDGE_ARC_GAP_DEG;
+            Vector3[] edgeArcPositions = new Vector3[EDGE_ARC_VERTICES];
+
+            for (int edgeArcI = 0; edgeArcI < edgeArcCount; edgeArcI++)
+            {
+                var edgeArcLineGo = new GameObject($"EdgeArc_{edgeArcI}");
+                edgeArcLineGo.transform.SetParent(_edgeArcsRoot, false);
+
+                var edgeArcLr = edgeArcLineGo.AddComponent<LineRenderer>();
+                SetupLineRenderer(edgeArcLr, EDGE_ARC_VERTICES, 8);
+                edgeArcLr.loop = false;
+                edgeArcLr.startWidth = EDGE_ARC_WIDTH;
+                edgeArcLr.endWidth = EDGE_ARC_WIDTH;
+                edgeArcLr.startColor = _edgeArcDim;
+                edgeArcLr.endColor = _edgeArcDim;
+
+                float edgeArcStartDeg = -90f + edgeArcI * (360f / edgeArcCount) + EDGE_ARC_GAP_DEG * 0.5f;
+                for (int edgeArcK = 0; edgeArcK < EDGE_ARC_VERTICES; edgeArcK++)
+                {
+                    float edgeArcDeg = edgeArcStartDeg + edgeArcSpan * edgeArcK / (EDGE_ARC_VERTICES - 1);
+                    float edgeArcRad = edgeArcDeg * Mathf.Deg2Rad;
+                    float edgeArcX = EDGE_ARC_RADIUS * Mathf.Cos(edgeArcRad);
+                    float edgeArcY = -EDGE_ARC_RADIUS * Mathf.Sin(edgeArcRad);
+                    edgeArcPositions[edgeArcK] = new Vector3(edgeArcX, edgeArcY, 0f);
+                }
+
+                edgeArcLr.SetPositions(edgeArcPositions);
+                edgeArcLr.enabled = false;
+                _edgeArcLines[edgeArcI] = edgeArcLr;
+            }
+
+            _cachedEdgeArcsLit = -1;
         }
 
         private void BuildParticles()
@@ -261,6 +318,7 @@ namespace BangsEdge.Game
             {
                 RenderAttractField(sim, nowMs);
                 RenderMeasureTarget(sim);
+                RenderEdgeArcs(sim);
             }
             else
             {
@@ -268,6 +326,7 @@ namespace BangsEdge.Game
                 _attractLine.enabled = false;
                 _attractGlowLine.enabled = false;
                 _measureTargetSr.enabled = false;
+                HideEdgeArcs();
             }
 
             // 3. 粒子の描画
@@ -369,6 +428,43 @@ namespace BangsEdge.Game
         {
             _measureTargetSr.enabled = true;
             _measureTargetSr.transform.localPosition = new Vector3((float)sim.CursorX, (float)(-sim.CursorY), 0f);
+        }
+
+        private void RenderEdgeArcs(BangSimulation sim)
+        {
+            if (sim.State != GameState.Attracting || sim.GraceCounter <= 0)
+            {
+                HideEdgeArcs();
+                return;
+            }
+
+            _edgeArcsRoot.localPosition = new Vector3((float)sim.CursorX, (float)(-sim.CursorY), 0f);
+
+            int edgeArcGrace = sim.GraceCounter;
+            if (edgeArcGrace != _cachedEdgeArcsLit)
+            {
+                for (int edgeArcI = 0; edgeArcI < _edgeArcLines.Length; edgeArcI++)
+                {
+                    Color edgeArcColor = (edgeArcI < edgeArcGrace) ? _edgeArcLit : _edgeArcDim;
+                    LineRenderer edgeArcLr = _edgeArcLines[edgeArcI];
+                    edgeArcLr.startColor = edgeArcColor;
+                    edgeArcLr.endColor = edgeArcColor;
+                    edgeArcLr.enabled = true;
+                }
+                _cachedEdgeArcsLit = edgeArcGrace;
+            }
+        }
+
+        private void HideEdgeArcs()
+        {
+            if (_cachedEdgeArcsLit != -1)
+            {
+                for (int edgeArcI = 0; edgeArcI < _edgeArcLines.Length; edgeArcI++)
+                {
+                    _edgeArcLines[edgeArcI].enabled = false;
+                }
+                _cachedEdgeArcsLit = -1;
+            }
         }
 
         private void RenderParticles(BangSimulation sim, float[] renderX, float[] renderY)
